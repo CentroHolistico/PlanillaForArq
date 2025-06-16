@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planilla de Control Horario - Obra</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .modal-backdrop { transition: opacity 0.3s ease; }
+        .modal-content { transition: transform 0.3s ease; }
+        .modal-hidden { opacity: 0; pointer-events: none; }
+        .modal-visible { opacity: 1; pointer-events: auto; }
+        .modal-content-hidden { transform: translateY(-50px) scale(0.95); }
+        .modal-content-visible { transform: translateY(0) scale(1); }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .7; } }
+        .status-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        
+        @media print {
+            body * { visibility: hidden; }
+            #report-content, #report-content * { visibility: visible; }
+            #report-content { position: absolute; left: 0; top: 0; width: 100%; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div id="app" class="max-w-7xl mx-auto">
+        <!-- Encabezado -->
+        <header class="mb-8 p-4 bg-white rounded-lg shadow-md no-print">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Planilla de Control Horario</h1>
+                    <p id="current-date" class="text-gray-500 text-sm md:text-base">Cargando...</p>
+                </div>
+                <div class="text-center md:text-right mt-4 md:mt-0">
+                    <p class="text-xs text-gray-400">ID de Sesión (para compartir):</p>
+                    <p id="user-id" class="text-sm font-mono bg-gray-100 px-2 py-1 rounded">Cargando...</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Controles Principales -->
+        <div class="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 no-print">
+            <button id="check-in-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-sm transition-transform transform hover:scale-105 flex items-center justify-center space-x-2"><i class="ph ph-timer"></i><span>Marcar Ingreso</span></button>
+            <button id="early-checkout-btn" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-lg shadow-sm transition-transform transform hover:scale-105 flex items-center justify-center space-x-2"><i class="ph ph-user-minus"></i><span>Salida Anticipada</span></button>
+            <button id="add-worker-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow-sm transition-transform transform hover:scale-105 flex items-center justify-center space-x-2"><i class="ph ph-user-plus"></i><span>Agregar Personal</span></button>
+            <button id="create-report-btn" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg shadow-sm transition-transform transform hover:scale-105 flex items-center justify-center space-x-2"><i class="ph ph-file-text"></i><span>Crear Reporte</span></button>
+        </div>
+
+        <!-- **NUEVO** Resumen de Totales -->
+        <div class="mb-6 p-4 bg-white rounded-lg shadow-md no-print">
+            <h2 class="text-lg font-semibold text-gray-700 mb-2">Resumen General</h2>
+            <div class="flex justify-between items-center">
+                <span class="text-gray-600">Costo Total Estimado Actual:</span>
+                <span id="grand-total-display" class="text-2xl font-bold text-green-600">$0.00</span>
+            </div>
+        </div>
+
+
+        <!-- Tabla de Obreros -->
+        <div class="bg-white rounded-lg shadow-md overflow-x-auto">
+            <table class="w-full text-sm text-left text-gray-600">
+                <thead class="text-xs text-gray-700 uppercase bg-gray-100 no-print">
+                    <tr>
+                        <th scope="col" class="p-4"><input type="checkbox" id="select-all-checkbox" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded"></th>
+                        <th scope="col" class="px-6 py-3">Obrero</th>
+                        <th scope="col" class="px-6 py-3">Categoría</th>
+                        <th scope="col" class="px-6 py-3">Estado / Retraso</th>
+                        <th scope="col" class="px-6 py-3 text-center">Horas Trabajadas</th>
+                        <th scope="col" class="px-6 py-3 text-right">Precio / Hr</th>
+                        <th scope="col" class="px-6 py-3 text-right">Total Acumulado</th>
+                        <th scope="col" class="px-6 py-3 text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="workers-table-body">
+                     <tr id="loading-row"><td colspan="8" class="text-center p-8"><div class="flex justify-center items-center space-x-2 text-gray-500"><i class="ph ph-circle-notch text-2xl animate-spin"></i><span>Cargando datos...</span></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modales -->
+    <div id="add-worker-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-hidden modal-backdrop bg-black bg-opacity-50 no-print">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md modal-content modal-content-hidden">
+            <form id="add-worker-form" class="p-6"><h2 class="text-2xl font-bold mb-6">Agregar Personal</h2><div class="mb-4"><label for="name" class="block text-sm font-bold mb-2">Nombre Completo:</label><input type="text" id="name" name="name" class="shadow border rounded w-full py-2 px-3" required></div><div class="mb-4"><label for="role" class="block text-sm font-bold mb-2">Cargo:</label><select id="role" name="role" class="shadow border rounded w-full py-2 px-3" required><option value="Ayudante">Ayudante</option><option value="Medio Oficial">Medio Oficial</option><option value="Oficial">Oficial</option><option value="Oficial Especializado">Oficial Especializado</option></select></div><div class="grid grid-cols-2 gap-4 mb-4"><div><label for="dni" class="block text-sm font-bold mb-2">DNI/CUIL:</label><input type="text" id="dni" name="dni" class="shadow border rounded w-full py-2 px-3"></div><div><label for="hourlyRate" class="block text-sm font-bold mb-2">Precio por Hora ($):</label><input type="number" id="hourlyRate" name="hourlyRate" step="0.01" class="shadow border rounded w-full py-2 px-3" required></div></div><div class="mb-6"><label for="email" class="block text-sm font-bold mb-2">Correo:</label><input type="email" id="email" name="email" class="shadow border rounded w-full py-2 px-3"></div><div class="flex justify-end space-x-4"><button type="button" id="cancel-add-worker" class="bg-gray-300 hover:bg-gray-400 font-bold py-2 px-4 rounded-lg">Cancelar</button><button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Guardar</button></div></form>
+        </div>
+    </div>
+    <div id="early-checkout-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-hidden modal-backdrop bg-black bg-opacity-50 no-print">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg modal-content modal-content-hidden">
+            <form id="early-checkout-form" class="p-6"><h2 class="text-2xl font-bold mb-4">Salida Anticipada</h2><p class="text-sm text-gray-600 mb-6">Selecciona el personal y especifica el motivo.</p><div id="early-checkout-worker-list" class="mb-4 max-h-60 overflow-y-auto border rounded-lg p-3 space-y-2"></div><div class="mb-6"><label for="checkout-reason" class="block text-sm font-bold mb-2">Motivo:</label><textarea id="checkout-reason" name="checkout-reason" rows="3" class="shadow border rounded w-full py-2 px-3" required></textarea></div><div class="flex justify-end space-x-4"><button type="button" id="cancel-early-checkout" class="bg-gray-300 hover:bg-gray-400 font-bold py-2 px-4 rounded-lg">Cancelar</button><button type="submit" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-lg">Confirmar</button></div></form>
+        </div>
+    </div>
+    <div id="report-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-hidden modal-backdrop bg-black bg-opacity-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-6xl modal-content modal-content-hidden flex flex-col" style="height: 90vh;">
+            <div id="report-content" class="p-6 md:p-8 overflow-y-auto">
+                <h2 class="text-3xl font-bold mb-2">Reporte General de Personal</h2>
+                <p id="report-date" class="text-gray-500 mb-6">Generado el...</p>
+                <div id="report-body"></div>
+            </div>
+            <div class="p-4 bg-gray-50 border-t flex justify-end space-x-4 no-print">
+                <button type="button" id="close-report-btn" class="bg-gray-300 hover:bg-gray-400 font-bold py-2 px-4 rounded-lg">Cerrar</button>
+                <button type="button" id="print-report-btn" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg flex items-center space-x-2"><i class="ph ph-printer"></i><span>Imprimir</span></button>
+            </div>
+        </div>
+    </div>
+    <div id="alert-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-hidden modal-backdrop bg-black bg-opacity-50 no-print">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm modal-content"><div class="p-6 text-center"><div id="alert-icon" class="mx-auto mb-4"></div><h3 id="alert-title" class="text-lg font-medium mb-2"></h3><p id="alert-message" class="text-sm text-gray-500"></p><div class="mt-6"><button id="alert-ok-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Entendido</button></div></div></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, addDoc, onSnapshot, updateDoc, deleteDoc, serverTimestamp, Timestamp, writeBatch, arrayUnion, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-timesheet-app';
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        let currentUserId = null;
+        let workersData = [];
+        let dailyProcessFlags = { noon: false, evening: false };
+
+        const el = (id) => document.getElementById(id);
+        const workersTableBody = el('workers-table-body');
+        const loadingRow = el('loading-row');
+        const selectAllCheckbox = el('select-all-checkbox');
+        const addWorkerBtn = el('add-worker-btn');
+        const checkInBtn = el('check-in-btn');
+        const earlyCheckoutBtn = el('early-checkout-btn');
+        const createReportBtn = el('create-report-btn');
+        const currentDateEl = el('current-date');
+        const userIdEl = el('user-id');
+        const grandTotalDisplay = el('grand-total-display'); // Nuevo elemento
+        const addWorkerModal = el('add-worker-modal');
+        const cancelAddWorkerBtn = el('cancel-add-worker');
+        const addWorkerForm = el('add-worker-form');
+        const earlyCheckoutModal = el('early-checkout-modal');
+        const cancelEarlyCheckoutBtn = el('cancel-early-checkout');
+        const earlyCheckoutForm = el('early-checkout-form');
+        const earlyCheckoutWorkerList = el('early-checkout-worker-list');
+        const alertModal = el('alert-modal');
+        const alertOkBtn = el('alert-ok-btn');
+        const alertTitle = el('alert-title');
+        const alertMessage = el('alert-message');
+        const alertIcon = el('alert-icon');
+        const reportModal = el('report-modal');
+        const closeReportBtn = el('close-report-btn');
+        const printReportBtn = el('print-report-btn');
+        const reportBody = el('report-body');
+        const reportDateEl = el('report-date');
+        
+        function showAlert(title, message, type = 'info') {
+            alertTitle.textContent = title;
+            alertMessage.textContent = message;
+            const icons = { success: '<i class="ph ph-check-circle text-4xl text-green-500"></i>', error: '<i class="ph ph-x-circle text-4xl text-red-500"></i>', info: '<i class="ph ph-info text-4xl text-blue-500"></i>' };
+            alertIcon.innerHTML = icons[type] || icons['info'];
+            toggleModal(alertModal, true);
+        }
+        alertOkBtn.addEventListener('click', () => toggleModal(alertModal, false));
+
+        function formatTime(totalSeconds) {
+            if (isNaN(totalSeconds) || totalSeconds < 0) return "00:00:00";
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        }
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount || 0);
+        }
+        function formatLatenessString(totalMinutes) {
+            if (!totalMinutes || totalMinutes <= 0) return '';
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            let result = 'RETRASO: ';
+            if (hours > 0) result += `${hours} h `;
+            if (minutes > 0) result += `${minutes} min`;
+            return result.trim();
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+            currentDateEl.textContent = now.toLocaleDateString('es-ES', options);
+        }
+
+        function toggleModal(modal, visible) {
+            const content = modal.querySelector('.modal-content');
+            if (visible) {
+                modal.classList.add('modal-visible');
+                modal.classList.remove('modal-hidden');
+                content.classList.add('modal-content-visible');
+                content.classList.remove('modal-content-hidden');
+            } else {
+                modal.classList.add('modal-hidden');
+                modal.classList.remove('modal-visible');
+                content.classList.add('modal-content-hidden');
+                content.classList.remove('modal-content-visible');
+            }
+        }
+        
+        addWorkerBtn.addEventListener('click', () => toggleModal(addWorkerModal, true));
+        cancelAddWorkerBtn.addEventListener('click', () => { toggleModal(addWorkerModal, false); addWorkerForm.reset(); });
+        createReportBtn.addEventListener('click', () => generateReport());
+        closeReportBtn.addEventListener('click', () => toggleModal(reportModal, false));
+        printReportBtn.addEventListener('click', () => window.print());
+
+        earlyCheckoutBtn.addEventListener('click', () => {
+            const activeWorkers = workersData.filter(w => w.checkedIn);
+            if (activeWorkers.length === 0) {
+                return showAlert('Información', 'No hay ningún obrero en turno.', 'info');
+            }
+            earlyCheckoutWorkerList.innerHTML = '';
+            activeWorkers.forEach(worker => {
+                const item = document.createElement('label');
+                item.className = 'flex items-center p-2 rounded-md hover:bg-gray-100 cursor-pointer';
+                item.innerHTML = `<input type="checkbox" name="early-checkout-workers" value="${worker.id}" class="h-4 w-4 text-orange-600 rounded"><span class="ml-3 text-gray-700">${worker.name}</span>`;
+                earlyCheckoutWorkerList.appendChild(item);
+            });
+            toggleModal(earlyCheckoutModal, true);
+        });
+        cancelEarlyCheckoutBtn.addEventListener('click', () => { toggleModal(earlyCheckoutModal, false); earlyCheckoutForm.reset(); });
+
+        onAuthStateChanged(auth, user => { if (user) { currentUserId = user.uid; userIdEl.textContent = currentUserId; listenToWorkers(); } });
+        async function authenticateUser() { try { const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; await (token ? signInWithCustomToken(auth, token) : signInAnonymously(auth)); } catch (error) { console.error(error); showAlert('Error', 'No se pudo autenticar.', 'error'); } }
+        
+        function listenToWorkers() {
+            const workersCollection = collection(db, `artifacts/${appId}/public/data/workers`);
+            onSnapshot(workersCollection, (snapshot) => { 
+                loadingRow.style.display = 'none'; 
+                const newWorkersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                const tableWorkerIds = new Set(Array.from(workersTableBody.querySelectorAll('tr')).map(tr => tr.dataset.workerId));
+                const dataWorkerIds = new Set(newWorkersData.map(w => w.id));
+
+                if (tableWorkerIds.size !== dataWorkerIds.size || !newWorkersData.every(w => tableWorkerIds.has(w.id))) {
+                    workersData = newWorkersData;
+                    renderWorkersTable();
+                } else {
+                    workersData = newWorkersData;
+                }
+            }, (error) => { console.error(error); showAlert('Error', 'No se pudo obtener la lista.', 'error'); });
+        }
+
+        function renderWorkersTable() {
+            const checkedIds = new Set(Array.from(document.querySelectorAll('.worker-checkbox:checked')).map(cb => cb.dataset.id));
+            workersTableBody.innerHTML = '';
+            if (workersData.length === 0) { workersTableBody.innerHTML = `<tr><td colspan="8" class="text-center p-8"><div class="text-gray-500"><i class="ph ph-users text-4xl mb-2"></i><p class="font-semibold">No hay personal.</p></div></td></tr>`; return; }
+            
+            const sortedWorkers = [...workersData].sort((a, b) => a.name.localeCompare(b.name));
+            sortedWorkers.forEach(worker => {
+                const row = document.createElement('tr');
+                row.className = 'bg-white border-b hover:bg-gray-50';
+                row.dataset.workerId = worker.id;
+                const isChecked = checkedIds.has(worker.id) ? 'checked' : '';
+                row.innerHTML = `
+                    <td class="p-4"><input type="checkbox" class="worker-checkbox w-4 h-4 text-blue-600 rounded" data-id="${worker.id}" ${isChecked}></td>
+                    <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">${worker.name}<div class="text-xs text-gray-500">${worker.dni || 'N/A'}</div></td>
+                    <td class="px-6 py-4">${worker.role}</td>
+                    <td class="px-6 py-4 status-cell"></td>
+                    <td class="px-6 py-4 text-center font-mono text-base duration-cell">00:00:00</td>
+                    <td class="px-6 py-4 text-right">${formatCurrency(worker.hourlyRate)}</td>
+                    <td class="px-6 py-4 text-right font-bold text-blue-600 pay-cell">${formatCurrency(0)}</td>
+                    <td class="px-6 py-4 text-center"><button class="delete-worker-btn text-red-500 hover:text-red-700" data-id="${worker.id}" title="Eliminar"><i class="ph ph-trash text-lg"></i></button></td>`;
+                workersTableBody.appendChild(row);
+                updateWorkerRow(worker.id);
+            });
+        }
+        
+        function updateWorkerRow(workerId) {
+            const worker = workersData.find(w => w.id === workerId);
+            const row = workersTableBody.querySelector(`tr[data-worker-id="${workerId}"]`);
+            if (!worker || !row) return;
+
+            const now = new Date();
+            let workDuration = worker.totalWorkSeconds || 0;
+            let statusHtml;
+
+            if (worker.checkedIn && worker.lastCheckInTime) {
+                workDuration += (now.getTime() - worker.lastCheckInTime.toDate().getTime()) / 1000;
+                statusHtml = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-200 text-green-800 status-pulse">EN TURNO</span>';
+            } else {
+                 const dailyStatus = worker.dailyStatus;
+                 if (dailyStatus && dailyStatus.date === now.toISOString().split('T')[0]) {
+                     if (dailyStatus.status === 'full-absence') {
+                         statusHtml = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-200 text-red-800">FALTA COMPLETA</span>';
+                     } else if(dailyStatus.status === 'half-absence') {
+                         statusHtml = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-200 text-yellow-800">MEDIA FALTA</span>';
+                     }
+                 }
+                if (!statusHtml) {
+                    const lateMinutes = calculateLateness(worker, now);
+                    if (lateMinutes > 0) {
+                        statusHtml = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-200 text-yellow-800">${formatLatenessString(lateMinutes)}</span>`;
+                    } else {
+                        statusHtml = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-200 text-gray-800">AUSENTE</span>';
+                    }
+                }
+            }
+            
+            const totalPay = (workDuration / 3600) * (worker.hourlyRate || 0);
+            
+            row.querySelector('.status-cell').innerHTML = statusHtml;
+            row.querySelector('.duration-cell').textContent = formatTime(workDuration);
+            row.querySelector('.pay-cell').textContent = formatCurrency(totalPay);
+        }
+
+        // **NUEVA FUNCIÓN** para calcular y mostrar el total general
+        function updateGrandTotal() {
+            const now = new Date();
+            let grandTotal = 0;
+            workersData.forEach(worker => {
+                let workDuration = worker.totalWorkSeconds || 0;
+                if (worker.checkedIn && worker.lastCheckInTime) {
+                    workDuration += (now.getTime() - worker.lastCheckInTime.toDate().getTime()) / 1000;
+                }
+                grandTotal += (workDuration / 3600) * (worker.hourlyRate || 0);
+            });
+            grandTotalDisplay.textContent = formatCurrency(grandTotal);
+        }
+
+        function calculateLateness(worker, now) {
+            const todayStr = now.toISOString().split('T')[0];
+            const dailyStatus = worker.dailyStatus;
+
+            if (worker.checkedIn || !dailyStatus || dailyStatus.date !== todayStr) return 0;
+
+            const hours = now.getHours();
+            
+            if (hours >= 8 && hours < 12 && !dailyStatus.checkedInTurn1) {
+                const shift1Start = new Date(now); shift1Start.setHours(8, 0, 0, 0);
+                return Math.max(0, Math.floor((now - shift1Start) / 60000));
+            }
+            if (hours >= 14 && hours < 18 && !dailyStatus.checkedInTurn2) {
+                const shift2Start = new Date(now); shift2Start.setHours(14, 0, 0, 0);
+                return Math.max(0, Math.floor((now - shift2Start) / 60000));
+            }
+            return 0;
+        }
+
+        checkInBtn.addEventListener('click', async () => {
+            const checkedBoxes = document.querySelectorAll('.worker-checkbox:checked');
+            if (checkedBoxes.length === 0) return showAlert('Atención', 'Selecciona al menos un obrero.', 'info');
+            
+            const selectedIds = Array.from(checkedBoxes).map(cb => cb.dataset.id);
+            const batch = writeBatch(db);
+            const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
+            const hours = now.getHours();
+            const isTurn1 = hours >= 8 && hours < 13;
+            const isTurn2 = hours >= 13 && hours < 18;
+
+            for (const id of selectedIds) {
+                const worker = workersData.find(w => w.id === id);
+                if (worker && !worker.checkedIn) {
+                    const lateMinutes = calculateLateness(worker, now);
+                    const workerRef = doc(db, `artifacts/${appId}/public/data/workers`, id);
+                    const updateData = {
+                        checkedIn: true,
+                        lastCheckInTime: Timestamp.fromDate(now),
+                        accumulatedLateMinutes: (worker.accumulatedLateMinutes || 0) + lateMinutes,
+                        "dailyStatus.date": todayStr,
+                        "dailyStatus.status": "present"
+                    };
+                    if (isTurn1) updateData["dailyStatus.checkedInTurn1"] = true;
+                    if (isTurn2) updateData["dailyStatus.checkedInTurn2"] = true;
+                    
+                    batch.update(workerRef, updateData);
+                }
+            }
+            await batch.commit();
+            showAlert('Éxito', `Ingreso registrado para ${selectedIds.length} obrero(s).`, 'success');
+            checkedBoxes.forEach(box => box.checked = false);
+            selectAllCheckbox.checked = false;
+        });
+        
+        earlyCheckoutForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(earlyCheckoutForm);
+            const selectedIds = formData.getAll('early-checkout-workers');
+            const reason = formData.get('checkout-reason').trim();
+            if (selectedIds.length === 0 || !reason) return showAlert('Error', 'Debes seleccionar obrero(s) y un motivo.', 'error');
+            
+            const batch = writeBatch(db);
+            const now = new Date();
+            for (const id of selectedIds) {
+                const worker = workersData.find(w => w.id === id);
+                if (worker && worker.checkedIn) {
+                    const sessionSeconds = (now.getTime() - worker.lastCheckInTime.toDate().getTime()) / 1000;
+                    const workerRef = doc(db, `artifacts/${appId}/public/data/workers`, id);
+                    batch.update(workerRef, { 
+                        checkedIn: false, 
+                        lastCheckInTime: null, 
+                        totalWorkSeconds: (worker.totalWorkSeconds || 0) + sessionSeconds, 
+                        earlyDepartures: arrayUnion({ reason: reason, date: Timestamp.fromDate(now) }) 
+                    });
+                }
+            }
+            await batch.commit();
+            toggleModal(earlyCheckoutModal, false);
+            earlyCheckoutForm.reset(); 
+            showAlert('Éxito', `Salida anticipada registrada.`, 'success');
+        });
+
+        async function handleDailyProcesses() {
+            const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
+            const hours = now.getHours();
+            const minutes = now.getMinutes();
+
+            // Auto Checkout
+            const noonCheckout = hours === 12 && minutes === 0;
+            const eveningCheckout = hours === 18 && minutes === 0;
+            if ((noonCheckout || eveningCheckout) && workersData.some(w => w.checkedIn)) {
+                const batch = writeBatch(db);
+                const checkoutTime = new Date(now); checkoutTime.setMinutes(0,0,0);
+                workersData.filter(w=>w.checkedIn).forEach(worker => {
+                    const sessionSeconds = (checkoutTime.getTime() - worker.lastCheckInTime.toDate().getTime()) / 1000;
+                    batch.update(doc(db, `artifacts/${appId}/public/data/workers`, worker.id), {
+                        checkedIn: false,
+                        lastCheckInTime: null,
+                        totalWorkSeconds: (worker.totalWorkSeconds || 0) + sessionSeconds
+                    });
+                });
+                await batch.commit();
+            }
+
+            // Absence Processing
+            const noonAbsenceCheck = hours === 12 && minutes >= 1 && !dailyProcessFlags.noon;
+            const eveningAbsenceCheck = hours === 18 && minutes >= 1 && !dailyProcessFlags.evening;
+
+            if (noonAbsenceCheck || eveningAbsenceCheck) {
+                const batch = writeBatch(db);
+                for(const worker of workersData) {
+                    const workerRef = doc(db, `artifacts/${appId}/public/data/workers`, worker.id);
+                    const daily = worker.dailyStatus || {};
+
+                    if (daily.date !== todayStr) continue;
+
+                    if (noonAbsenceCheck && !daily.checkedInTurn1) {
+                        batch.update(workerRef, { "dailyStatus.status": "half-absence" });
+                    }
+                    if (eveningAbsenceCheck) {
+                        if (!daily.checkedInTurn1 && !daily.checkedInTurn2) {
+                            batch.update(workerRef, { "dailyStatus.status": "full-absence" });
+                        } else if (!daily.checkedInTurn2 && daily.status !== "full-absence") {
+                            batch.update(workerRef, { "dailyStatus.status": "half-absence" });
+                        }
+                    }
+                }
+                await batch.commit();
+                if(noonAbsenceCheck) dailyProcessFlags.noon = true;
+                if(eveningAbsenceCheck) dailyProcessFlags.evening = true;
+            }
+
+            // Reset flags and daily status for the new day
+            if (hours === 0 && (dailyProcessFlags.noon || dailyProcessFlags.evening)) {
+                 const batch = writeBatch(db);
+                 workersData.forEach(worker => {
+                     const workerRef = doc(db, `artifacts/${appId}/public/data/workers`, worker.id);
+                     batch.update(workerRef, {
+                        "dailyStatus.date": new Date().toISOString().split('T')[0],
+                        "dailyStatus.checkedInTurn1": false,
+                        "dailyStatus.checkedInTurn2": false,
+                        "dailyStatus.status": "pending"
+                    });
+                 });
+                 await batch.commit();
+                 dailyProcessFlags = { noon: false, evening: false };
+                 console.log("Daily status reset for new day.");
+            }
+        }
+        
+        addWorkerForm.addEventListener('submit', async (e) => { 
+            e.preventDefault(); 
+            const fd = new FormData(addWorkerForm); 
+            const today = new Date().toISOString().split('T')[0];
+            const newWorker = { name: fd.get('name'), role: fd.get('role'), dni: fd.get('dni'), email: fd.get('email'), hourlyRate: parseFloat(fd.get('hourlyRate')), checkedIn: false, lastCheckInTime: null, totalWorkSeconds: 0, accumulatedLateMinutes: 0, earlyDepartures: [], attendanceHistory: [], dailyStatus: { date: today, checkedInTurn1: false, checkedInTurn2: false, status: 'pending'}, createdAt: serverTimestamp() }; 
+            try { 
+                await addDoc(collection(db, `artifacts/${appId}/public/data/workers`), newWorker); 
+                showAlert('Éxito', `${newWorker.name} ha sido agregado.`, 'success'); 
+                toggleModal(addWorkerModal, false); addWorkerForm.reset(); 
+            } catch (err) { console.error(err); showAlert('Error', 'No se pudo agregar al obrero.', 'error'); } 
+        });
+        
+        workersTableBody.addEventListener('click', async (e) => { if (e.target.closest('.delete-worker-btn')) { const btn = e.target.closest('.delete-worker-btn'); const workerId = btn.dataset.id; const worker = workersData.find(w => w.id === workerId); if (confirm(`¿Eliminar a ${worker.name}?`)) { try { await deleteDoc(doc(db, `artifacts/${appId}/public/data/workers`, workerId)); showAlert('Eliminado', `${worker.name} fue eliminado.`, 'success'); } catch (err) { showAlert('Error', `No se pudo eliminar.`, 'error'); } } } });
+        selectAllCheckbox.addEventListener('change', (e) => { document.querySelectorAll('.worker-checkbox').forEach(cb => cb.checked = e.target.checked); });
+        
+        function generateReport() {
+            const now = new Date();
+            reportDateEl.textContent = `Generado el ${now.toLocaleDateString('es-ES')} a las ${now.toLocaleTimeString('es-ES')}`;
+            
+            let grandTotal = 0;
+            const workerReports = workersData.map(worker => {
+                const totalPay = (worker.totalWorkSeconds / 3600) * (worker.hourlyRate || 0);
+                grandTotal += totalPay;
+
+                const departuresHTML = (worker.earlyDepartures && worker.earlyDepartures.length > 0)
+                    ? `<ul class="list-disc list-inside space-y-1 text-sm">${worker.earlyDepartures.map(d => `<li><span class="font-semibold">${d.date.toDate().toLocaleDateString('es-ES')}:</span> ${d.reason}</li>`).join('')}</ul>`
+                    : '<p class="text-sm text-gray-500">Ninguna</p>';
+                
+                const todayStr = new Date().toISOString().split('T')[0];
+                const attendanceHistory = [];
+                if(worker.dailyStatus && worker.dailyStatus.date === todayStr && (worker.dailyStatus.status === 'half-absence' || worker.dailyStatus.status === 'full-absence')) {
+                    attendanceHistory.push({date: worker.dailyStatus.date, status: worker.dailyStatus.status});
+                }
+                
+                const attendanceHTML = (attendanceHistory.length > 0)
+                    ? `<ul class="list-disc list-inside space-y-1 text-sm">${attendanceHistory.map(a => {
+                        const color = a.status === 'full-absence' ? 'text-red-600' : 'text-yellow-600';
+                        const text = a.status === 'full-absence' ? 'Falta Completa' : 'Media Falta';
+                        return `<li><span class="font-semibold">${new Date(a.date.replace(/-/g, '/')).toLocaleDateString('es-ES')}:</span> <span class="${color} font-medium">${text}</span></li>`;
+                    }).join('')}</ul>`
+                    : '<p class="text-sm text-gray-500">Sin Novedades</p>';
+
+                return `
+                    <div class="p-4 border rounded-lg bg-gray-50 break-inside-avoid">
+                        <h3 class="text-xl font-bold">${worker.name}</h3>
+                        <p class="text-sm text-gray-600 mb-4">${worker.role} - DNI: ${worker.dni || 'N/A'}</p>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                            <div><p class="text-xs uppercase">Horas Totales</p><p class="text-2xl font-semibold">${formatTime(worker.totalWorkSeconds || 0)}</p></div>
+                            <div><p class="text-xs uppercase">Minutos de Retraso</p><p class="text-2xl font-semibold">${worker.accumulatedLateMinutes || 0}</p></div>
+                            <div><p class="text-xs uppercase">Pago Estimado</p><p class="text-2xl font-semibold text-green-600">${formatCurrency(totalPay)}</p></div>
+                        </div>
+                        <div class="mt-4 pt-4 border-t"><h4 class="font-semibold text-sm">Salidas Anticipadas:</h4>${departuresHTML}</div>
+                        <div class="mt-4 pt-4 border-t"><h4 class="font-semibold text-sm">Historial de Asistencia (Hoy):</h4>${attendanceHTML}</div>
+                    </div>`;
+            }).join('');
+            
+            const totalSummaryHTML = `
+                <div class="p-6 mb-6 border-b-2 border-indigo-500 bg-indigo-50 rounded-lg">
+                    <h3 class="text-lg font-semibold text-gray-800 text-center">Total a Pagar (Todos los Obreros)</h3>
+                    <p class="text-4xl font-bold text-indigo-600 text-center mt-2">${formatCurrency(grandTotal)}</p>
+                </div>
+            `;
+            
+            reportBody.innerHTML = totalSummaryHTML + `<div class="space-y-6">` + workerReports + `</div>`;
+            toggleModal(reportModal, true);
+        }
+
+        window.onload = () => {
+            updateClock();
+            setInterval(updateClock, 60000); 
+            setInterval(() => {
+                workersData.forEach(w => updateWorkerRow(w.id));
+                updateGrandTotal(); // Actualiza el total general cada segundo
+            }, 1000);
+            setInterval(handleDailyProcesses, 60000); 
+            authenticateUser();
+        };
+    </script>
+</body>
+</html>
