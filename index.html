@@ -243,7 +243,789 @@
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, collection, getDocs, onSnapshot, updateDoc, deleteDoc, serverTimestamp, Timestamp, writeBatch, arrayUnion, runTransaction, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // ... (el resto del script se mantiene igual)
+        const firebaseConfig = {
+          apiKey: "AIzaSyBmqG6_pD7OzSGhOaZSRc4IVfXwNaADE8U",
+          authDomain: "planilla-c17ab.firebaseapp.com",
+          projectId: "planilla-c17ab",
+          storageBucket: "planilla-c17ab.appspot.com",
+          messagingSenderId: "993902505533",
+          appId: "1:993902505533:web:9154f4bd2c95e088c78454"
+        };
+        
+        const appId = 'planilla-c17ab';
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        let currentUserId = null;
+        let workersData = [];
+        let dailyProcessFlags = { morning: false, evening: false };
+        let pendingAction = { type: null, workerId: null };
+        let currentReportData = { range: null, data: [] };
+        let dailyRecordsCache = {};
+
+        const el = (id) => document.getElementById(id);
+        const workersTableBody = el('workers-table-body');
+        const loadingRow = el('loading-row');
+        const selectAllCheckbox = el('select-all-checkbox');
+        const addWorkerBtn = el('add-worker-btn');
+        const checkInBtn = el('check-in-btn');
+        const earlyCheckoutBtn = el('early-checkout-btn');
+        const createReportBtn = el('create-report-btn');
+        const managementBtn = el('management-btn');
+        const currentDateEl = el('current-date');
+        const userIdEl = el('user-id');
+        const grandTotalDisplay = el('grand-total-display');
+        const addWorkerModal = el('add-worker-modal');
+        const cancelAddWorkerBtn = el('cancel-add-worker');
+        const addWorkerForm = el('add-worker-form');
+        const editWorkerModal = el('edit-worker-modal');
+        const cancelEditWorkerBtn = el('cancel-edit-worker');
+        const editWorkerForm = el('edit-worker-form');
+        const passwordModal = el('password-modal');
+        const passwordTitle = el('password-title');
+        const cancelPasswordBtn = el('cancel-password');
+        const passwordForm = el('password-form');
+        const togglePasswordBtn = el('toggle-password-btn');
+        const passwordInput = el('password');
+        const passwordIcon = el('password-icon');
+        const earlyCheckoutModal = el('early-checkout-modal');
+        const cancelEarlyCheckoutBtn = el('cancel-early-checkout');
+        const earlyCheckoutForm = el('early-checkout-form');
+        const earlyCheckoutWorkerList = el('early-checkout-worker-list');
+        const managementModal = el('management-modal');
+        const closeManagementBtn = el('close-management-btn');
+        const managementWorkerList = el('management-worker-list');
+        const adjustSelectedBtn = el('adjust-selected-btn');
+        const adjustmentDetailModal = el('adjustment-detail-modal');
+        const cancelAdjustmentDetailBtn = el('cancel-adjustment-detail');
+        const adjustmentDetailForm = el('adjustment-detail-form');
+        const adjustmentDateSelector = el('adjustment-date-selector');
+        const reportModal = el('report-modal');
+        const generateNewReportBtn = el('generate-new-report-btn');
+        const downloadCsvBtn = el('download-csv-btn');
+        const alertModal = el('alert-modal');
+        const alertOkBtn = el('alert-ok-btn');
+        const alertTitle = el('alert-title');
+        const alertMessage = el('alert-message');
+        const alertIcon = el('alert-icon');
+        const closeReportBtn = el('close-report-btn');
+        const reportDateRange = el('report-date-range');
+        const reportBody = el('report-body');
+        const tabs = {
+            diario: el('tab-diario'),
+            mensual: el('tab-mensual'),
+            total: el('tab-total'),
+        };
+        const tabContents = {
+            diario: el('tab-content-diario'),
+            mensual: el('tab-content-mensual'),
+            total: el('tab-content-total'),
+        };
+        
+        function showAlert(title, message, type = 'info') {
+            alertTitle.textContent = title;
+            alertMessage.textContent = message;
+            const icons = { success: '<i class="ph ph-check-circle text-4xl text-green-500"></i>', error: '<i class="ph ph-x-circle text-4xl text-red-500"></i>', info: '<i class="ph ph-info text-4xl text-blue-500"></i>' };
+            alertIcon.innerHTML = icons[type] || icons['info'];
+            toggleModal(alertModal, true);
+        }
+        alertOkBtn.addEventListener('click', () => toggleModal(alertModal, false));
+
+        function formatTime(totalSeconds) {
+            if (isNaN(totalSeconds) || totalSeconds < 0) return "00:00";
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        }
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount || 0);
+        }
+        function formatLatenessString(totalMinutes) {
+            if (!totalMinutes || totalMinutes <= 0) return '';
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            let result = 'RETRASO: ';
+            if (hours > 0) result += `${hours} h `;
+            if (minutes > 0) result += `${minutes} min`;
+            return result.trim();
+        }
+        function timestampToHHMM(timestamp) {
+            if (!timestamp) return '';
+            const date = timestamp.toDate();
+            const hours = date.getHours().toString().padStart(2, '0');
+            const minutes = date.getMinutes().toString().padStart(2, '0');
+            return `${hours}:${minutes}`;
+        }
+        function dateToYYYYMMDD(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+            currentDateEl.textContent = now.toLocaleDateString('es-ES', options);
+        }
+
+        function toggleModal(modal, visible) {
+            const content = modal.querySelector('.modal-content');
+            if (visible) {
+                modal.classList.add('modal-visible');
+                modal.classList.remove('modal-hidden');
+                content.classList.add('modal-content-visible');
+                content.classList.remove('modal-content-hidden');
+            } else {
+                modal.classList.add('modal-hidden');
+                modal.classList.remove('modal-visible');
+                content.classList.add('modal-content-hidden');
+                content.classList.remove('modal-content-visible');
+            }
+        }
+        
+        // Listeners
+        addWorkerBtn.addEventListener('click', () => toggleModal(addWorkerModal, true));
+        cancelAddWorkerBtn.addEventListener('click', () => { toggleModal(addWorkerModal, false); addWorkerForm.reset(); });
+        cancelEditWorkerBtn.addEventListener('click', () => { toggleModal(editWorkerModal, false); editWorkerForm.reset(); });
+        cancelPasswordBtn.addEventListener('click', () => { toggleModal(passwordModal, false); passwordForm.reset(); });
+        cancelAdjustmentDetailBtn.addEventListener('click', () => { toggleModal(adjustmentDetailModal, false); });
+        createReportBtn.addEventListener('click', () => handleReportGeneration(null, true));
+        generateNewReportBtn.addEventListener('click', () => handleReportGeneration(null, false));
+        downloadCsvBtn.addEventListener('click', () => generateAndDownloadCSV());
+        closeReportBtn.addEventListener('click', () => toggleModal(reportModal, false));
+        
+        earlyCheckoutBtn.addEventListener('click', () => {
+            const activeWorkers = workersData.filter(w => w.checkedIn);
+            if (activeWorkers.length === 0) return showAlert('Información', 'No hay ningún obrero en turno.', 'info');
+            earlyCheckoutWorkerList.innerHTML = '';
+            activeWorkers.forEach(worker => {
+                const item = document.createElement('label');
+                item.className = 'flex items-center p-2 rounded-md hover:bg-gray-100 cursor-pointer';
+                item.innerHTML = `<input type="checkbox" name="early-checkout-workers" value="${worker.id}" class="h-4 w-4 text-orange-600 rounded"><span class="ml-3 text-gray-700">${worker.name}</span>`;
+                earlyCheckoutWorkerList.appendChild(item);
+            });
+            toggleModal(earlyCheckoutModal, true);
+        });
+        cancelEarlyCheckoutBtn.addEventListener('click', () => { toggleModal(earlyCheckoutModal, false); earlyCheckoutForm.reset(); });
+        togglePasswordBtn.addEventListener('click', () => {
+            const isPassword = passwordInput.type === 'password';
+            passwordInput.type = isPassword ? 'text' : 'password';
+            passwordIcon.className = isPassword ? 'ph ph-eye-slash' : 'ph ph-eye';
+        });
+        managementBtn.addEventListener('click', () => {
+            pendingAction = { type: 'management' };
+            passwordTitle.textContent = "Acceso a Gerencia";
+            toggleModal(passwordModal, true);
+        });
+        closeManagementBtn.addEventListener('click', () => toggleModal(managementModal, false));
+        
+        auth.onAuthStateChanged(user => { if (user) { currentUserId = user.uid; userIdEl.textContent = currentUserId.substring(0, 8); listenToWorkers(); } });
+        
+        async function authenticateUser() {
+            try { await signInAnonymously(auth); } catch (error) {
+                console.error("Authentication Error:", error);
+                if (error.code === 'auth/configuration-not-found') {
+                     showAlert( 'Error de Configuración de Firebase', 'El inicio de sesión anónimo no está habilitado. Ve a tu Consola de Firebase > Authentication > Sign-in method y activa el proveedor "Anónimo".', 'error');
+                } else { showAlert('Error de Autenticación', 'No se pudo conectar.', 'error'); }
+            }
+        }
+        
+        function listenToWorkers() {
+            const workersCollection = collection(db, `artifacts/${appId}/public/data/workers`);
+            onSnapshot(workersCollection, (snapshot) => { 
+                loadingRow.style.display = 'none'; 
+                const newWorkersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                workersData = newWorkersData;
+                renderWorkersTable();
+            }, (error) => { console.error(error); showAlert('Error', 'No se pudo obtener la lista.', 'error'); });
+        }
+
+        async function renderWorkersTable() {
+            const checkedIds = new Set(Array.from(document.querySelectorAll('.worker-checkbox:checked')).map(cb => cb.dataset.id));
+            workersTableBody.innerHTML = '';
+            if (workersData.length === 0) { workersTableBody.innerHTML = `<tr><td colspan="9" class="text-center p-8"><div class="text-gray-500"><i class="ph ph-users text-4xl mb-2"></i><p class="font-semibold">No hay personal.</p></div></td></tr>`; return; }
+            const sortedWorkers = [...workersData].sort((a, b) => a.name.localeCompare(b.name));
+            
+            for (const [index, worker] of sortedWorkers.entries()) {
+                const row = document.createElement('tr');
+                const bgColorClass = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                row.className = `${bgColorClass} border-b hover:bg-blue-100`;
+                row.dataset.workerId = worker.id;
+                const isChecked = checkedIds.has(worker.id) ? 'checked' : '';
+                row.innerHTML = `
+                    <td class="p-4"><input type="checkbox" class="worker-checkbox w-4 h-4 text-blue-600 rounded" data-id="${worker.id}" ${isChecked}></td>
+                    <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">${worker.name}<div class="text-xs text-gray-500">${worker.dni || 'N/A'}</div></td>
+                    <td class="px-6 py-4">${worker.role}</td>
+                    <td class="px-6 py-4 status-cell"></td>
+                    <td class="px-6 py-4 text-center font-mono text-base daily-duration-cell">00:00</td>
+                    <td class="px-6 py-4 text-center font-mono text-base total-duration-cell">00:00</td>
+                    <td class="px-6 py-4 text-right">${formatCurrency(worker.hourlyRate)}</td>
+                    <td class="px-6 py-4 text-right font-bold text-blue-600 pay-cell">${formatCurrency(0)}</td>
+                    <td class="px-6 py-4 text-center">
+                        <div class="flex items-center justify-center space-x-3">
+                            <button class="edit-worker-btn text-blue-500 hover:text-blue-700" data-id="${worker.id}" title="Editar Obrero"><i class="ph ph-pencil-simple text-lg"></i></button>
+                            <button class="delete-worker-btn text-red-500 hover:text-red-700" data-id="${worker.id}" title="Eliminar Obrero"><i class="ph ph-trash text-lg"></i></button>
+                        </div>
+                    </td>`;
+                workersTableBody.appendChild(row);
+                updateWorkerRow(worker.id);
+            }
+        }
+        
+        async function updateWorkerRow(workerId) {
+            const worker = workersData.find(w => w.id === workerId);
+            const row = workersTableBody.querySelector(`tr[data-worker-id="${workerId}"]`);
+            if (!worker || !row) return;
+
+            const now = new Date();
+            const todayStr = dateToYYYYMMDD(now);
+            let totalWorkDuration = worker.totalWorkSeconds || 0;
+            let statusHtml;
+
+            const dailyRecord = await getOrCreateDailyRecord(workerId, todayStr);
+            let dailyWorkSeconds = dailyRecord.workSeconds || 0;
+
+            if (worker.checkedIn && worker.lastCheckInTime) {
+                const sessionSeconds = (now.getTime() - worker.lastCheckInTime.toDate().getTime()) / 1000;
+                totalWorkDuration += sessionSeconds;
+                dailyWorkSeconds += sessionSeconds;
+                statusHtml = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-200 text-green-800 status-pulse">EN TURNO</span>';
+            } else {
+                 if (dailyRecord.status === 'full-absence') {
+                     statusHtml = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-200 text-red-800">FALTA COMPLETA</span>';
+                 } else if(dailyRecord.status === 'half-absence') {
+                     statusHtml = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-200 text-yellow-800">MEDIA FALTA</span>';
+                 } else {
+                    const lateMinutes = calculateLateness(worker, now);
+                    if (lateMinutes > 0) {
+                        statusHtml = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-200 text-yellow-800">${formatLatenessString(lateMinutes)}</span>`;
+                    } else {
+                        statusHtml = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-200 text-gray-800">AUSENTE</span>';
+                    }
+                }
+            }
+            
+            const totalPay = (totalWorkDuration / 3600) * (worker.hourlyRate || 0);
+            
+            row.querySelector('.status-cell').innerHTML = statusHtml;
+            row.querySelector('.daily-duration-cell').textContent = formatTime(dailyWorkSeconds);
+            row.querySelector('.total-duration-cell').textContent = formatTime(totalWorkDuration);
+            row.querySelector('.pay-cell').textContent = formatCurrency(totalPay);
+        }
+
+
+        function updateGrandTotal() {
+            const now = new Date();
+            let grandTotal = 0;
+            workersData.forEach(worker => {
+                let workDuration = worker.totalWorkSeconds || 0;
+                if (worker.checkedIn && worker.lastCheckInTime) {
+                    workDuration += (now.getTime() - worker.lastCheckInTime.toDate().getTime()) / 1000;
+                }
+                grandTotal += (workDuration / 3600) * (worker.hourlyRate || 0);
+            });
+            grandTotalDisplay.textContent = formatCurrency(grandTotal);
+        }
+
+        function calculateLateness(worker, now) {
+            const todayStr = dateToYYYYMMDD(now);
+            const dailyStatus = worker.dailyStatus;
+            if (worker.checkedIn || !dailyStatus || dailyStatus.date !== todayStr) return 0;
+            const hours = now.getHours();
+            
+            const shift1Start = new Date(now); shift1Start.setHours(7, 30, 0, 0);
+            const shift1End = new Date(now); shift1End.setHours(11, 30, 0, 0);
+            if (now >= shift1Start && now < shift1End && !dailyStatus.checkedInTurn1) {
+                return Math.max(0, Math.floor((now - shift1Start) / 60000));
+            }
+            const shift2Start = new Date(now); shift2Start.setHours(14, 0, 0, 0);
+            const shift2End = new Date(now); shift2End.setHours(18, 0, 0, 0);
+            if (now >= shift2Start && now < shift2End && !dailyStatus.checkedInTurn2) {
+                return Math.max(0, Math.floor((now - shift2Start) / 60000));
+            }
+            return 0;
+        }
+
+        async function getOrCreateDailyRecord(workerId, dateStr) {
+            if (dailyRecordsCache[workerId] && dailyRecordsCache[workerId][dateStr]) {
+                return dailyRecordsCache[workerId][dateStr];
+            }
+
+            const recordRef = doc(db, `artifacts/${appId}/public/data/workers/${workerId}/dailyRecords`, dateStr);
+            let recordSnap = await getDoc(recordRef);
+            let data;
+            if (!recordSnap.exists()) {
+                data = {
+                    date: dateStr, checkedInTurn1: false, checkedInTurn2: false, status: 'pending',
+                    checkInTimeTurn1: null, checkOutTimeTurn1: null, checkInTimeTurn2: null, checkOutTimeTurn2: null, workSeconds: 0
+                };
+                await setDoc(recordRef, data);
+            } else {
+                data = recordSnap.data();
+            }
+
+            if (!dailyRecordsCache[workerId]) {
+                dailyRecordsCache[workerId] = {};
+            }
+            dailyRecordsCache[workerId][dateStr] = data;
+            return data;
+        }
+
+        checkInBtn.addEventListener('click', async () => {
+            const checkedBoxes = document.querySelectorAll('.worker-checkbox:checked');
+            if (checkedBoxes.length === 0) return showAlert('Atención', 'Selecciona al menos un obrero.', 'info');
+            
+            const selectedIds = Array.from(checkedBoxes).map(cb => cb.dataset.id);
+            const now = new Date();
+            const todayStr = dateToYYYYMMDD(now);
+            const hours = now.getHours();
+            const isTurn1 = hours >= 7 && hours < 13;
+            const isTurn2 = hours >= 13 && hours < 18;
+
+            for (const id of selectedIds) {
+                const worker = workersData.find(w => w.id === id);
+                if (worker && !worker.checkedIn) {
+                    await runTransaction(db, async (transaction) => {
+                        const workerRef = doc(db, `artifacts/${appId}/public/data/workers`, id);
+                        const dailyRecordRef = doc(db, `artifacts/${appId}/public/data/workers/${id}/dailyRecords`, todayStr);
+                        const workerDoc = await transaction.get(workerRef);
+                        
+                        const lateMinutes = calculateLateness(worker, now);
+                        transaction.update(workerRef, {
+                            checkedIn: true, lastCheckInTime: Timestamp.fromDate(now), accumulatedLateMinutes: (workerDoc.data().accumulatedLateMinutes || 0) + lateMinutes,
+                            "dailyStatus.status": "present", "dailyStatus.date": todayStr
+                        });
+                        
+                        const dailyUpdate = { date: todayStr, status: 'present' };
+                        if (isTurn1) {
+                            dailyUpdate.checkedInTurn1 = true;
+                            dailyUpdate.checkInTimeTurn1 = Timestamp.fromDate(now);
+                        }
+                         if (isTurn2) {
+                            dailyUpdate.checkedInTurn2 = true;
+                            dailyUpdate.checkInTimeTurn2 = Timestamp.fromDate(now);
+                        }
+                        transaction.set(dailyRecordRef, dailyUpdate, { merge: true });
+                    });
+                }
+            }
+            showAlert('Éxito', `Ingreso registrado para ${selectedIds.length} obrero(s).`, 'success');
+            checkedBoxes.forEach(box => box.checked = false);
+            selectAllCheckbox.checked = false;
+        });
+        
+        earlyCheckoutForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(earlyCheckoutForm);
+            const selectedIds = formData.getAll('early-checkout-workers');
+            const reason = formData.get('checkout-reason').trim();
+            if (selectedIds.length === 0 || !reason) return showAlert('Error', 'Debes seleccionar obrero(s) y un motivo.', 'error');
+            
+            const now = new Date();
+            const todayStr = dateToYYYYMMDD(now);
+            const hours = now.getHours();
+            const isTurn1 = hours >= 7 && hours < 13;
+
+            for (const id of selectedIds) {
+                const worker = workersData.find(w => w.id === id);
+                if (worker && worker.checkedIn) {
+                    await runTransaction(db, async (transaction) => {
+                        const workerRef = doc(db, `artifacts/${appId}/public/data/workers`, id);
+                        const dailyRecordRef = doc(db, `artifacts/${appId}/public/data/workers/${id}/dailyRecords`, todayStr);
+                        const workerDoc = await transaction.get(workerRef);
+                        const dailyDoc = await transaction.get(dailyRecordRef);
+                        if (!workerDoc.exists()) throw "Worker does not exist!";
+                        
+                        const sessionSeconds = (now.getTime() - workerDoc.data().lastCheckInTime.toDate().getTime()) / 1000;
+                        const newTotalSeconds = (workerDoc.data().totalWorkSeconds || 0) + sessionSeconds;
+                        
+                        transaction.update(workerRef, { 
+                            checkedIn: false, lastCheckInTime: null, totalWorkSeconds: newTotalSeconds, earlyDepartures: arrayUnion({ reason, date: Timestamp.fromDate(now) }) 
+                        });
+
+                        const dailyUpdate = {};
+                        if (isTurn1) dailyUpdate.checkOutTimeTurn1 = Timestamp.fromDate(now);
+                        else dailyUpdate.checkOutTimeTurn2 = Timestamp.fromDate(now);
+                        
+                        if (dailyDoc.exists()) transaction.update(dailyRecordRef, dailyUpdate);
+                        else { dailyUpdate.date = todayStr; transaction.set(dailyRecordRef, dailyUpdate); }
+                    });
+                }
+            }
+            toggleModal(earlyCheckoutModal, false);
+            earlyCheckoutForm.reset(); 
+            showAlert('Éxito', `Salida anticipada registrada.`, 'success');
+        });
+
+        async function handleDailyProcesses() {
+            // ... (código existente)
+        }
+        
+        addWorkerForm.addEventListener('submit', async (e) => { 
+            e.preventDefault(); 
+            const fd = new FormData(addWorkerForm); 
+            const newWorker = { name: fd.get('name'), role: fd.get('role'), dni: fd.get('dni'), email: fd.get('email'), hourlyRate: parseFloat(fd.get('hourlyRate')), checkedIn: false, lastCheckInTime: null, totalWorkSeconds: 0, accumulatedLateMinutes: 0, earlyDepartures: [], createdAt: serverTimestamp() }; 
+            try { 
+                await addDoc(collection(db, `artifacts/${appId}/public/data/workers`), newWorker); 
+                showAlert('Éxito', `${newWorker.name} ha sido agregado.`, 'success'); 
+                toggleModal(addWorkerModal, false); addWorkerForm.reset(); 
+            } catch (err) { console.error(err); showAlert('Error', 'No se pudo agregar al obrero.', 'error'); } 
+        });
+
+        editWorkerForm.addEventListener('submit', async (e) => {
+            // ... (código existente)
+        });
+
+        adjustmentDetailForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const workerId = el('adjust-detail-worker-id').value;
+            const dateStr = el('adjustment-date-selector').value;
+            if (!dateStr) return showAlert('Error', 'Debe seleccionar una fecha para ajustar.', 'error');
+            const dateForTimestamp = new Date(dateStr.replace(/-/g, '/'));
+            
+            const timeToTimestamp = (timeStr) => {
+                if (!timeStr) return null;
+                const [hours, minutes] = timeStr.split(':');
+                const date = new Date(dateForTimestamp);
+                date.setHours(hours, minutes, 0, 0);
+                return Timestamp.fromDate(date);
+            };
+
+            const t_in1 = timeToTimestamp(el('adjust-check-in-1').value);
+            const t_out1 = timeToTimestamp(el('adjust-check-out-1').value);
+            const t_in2 = timeToTimestamp(el('adjust-check-in-2').value);
+            const t_out2 = timeToTimestamp(el('adjust-check-out-2').value);
+
+            let newDailyWorkSeconds = 0;
+            if (t_in1 && t_out1 && t_out1.seconds > t_in1.seconds) newDailyWorkSeconds += (t_out1.seconds - t_in1.seconds);
+            if (t_in2 && t_out2 && t_out2.seconds > t_in2.seconds) newDailyWorkSeconds += (t_out2.seconds - t_in2.seconds);
+            
+            const newAccumulatedLateMinutes = parseInt(el('adjust-lateness').value, 10) || 0;
+            const newStatus = el('adjust-attendance-status').value;
+
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const workerRef = doc(db, `artifacts/${appId}/public/data/workers`, workerId);
+                    const dailyRecordRef = doc(db, `artifacts/${appId}/public/data/workers/${workerId}/dailyRecords`, dateStr);
+                    
+                    const workerDoc = await transaction.get(workerRef);
+                    if (!workerDoc.exists()) throw "Worker document not found!";
+                    const dailyDoc = await transaction.get(dailyRecordRef);
+
+                    const oldTotalWorkSeconds = workerDoc.data().totalWorkSeconds || 0;
+                    const oldDailyWorkSeconds = dailyDoc.exists() ? (dailyDoc.data().workSeconds || 0) : 0;
+                    
+                    const workSecondsDelta = newDailyWorkSeconds - oldDailyWorkSeconds;
+                    const newTotalWorkSeconds = oldTotalWorkSeconds + workSecondsDelta;
+                    
+                    const updatedDailyData = {
+                        date: dateStr, workSeconds: newDailyWorkSeconds,
+                        checkInTimeTurn1: t_in1, checkOutTimeTurn1: t_out1,
+                        checkInTimeTurn2: t_in2, checkOutTimeTurn2: t_out2,
+                        status: newStatus,
+                        checkedInTurn1: !!t_in1,
+                        checkedInTurn2: !!t_in2,
+                    };
+                    
+                    const workerUpdateData = {
+                        totalWorkSeconds: newTotalWorkSeconds,
+                        accumulatedLateMinutes: newAccumulatedLateMinutes,
+                    };
+
+                    if (dateStr === dateToYYYYMMDD(new Date())) {
+                        workerUpdateData['dailyStatus'] = updatedDailyData;
+                    }
+
+                    transaction.update(workerRef, workerUpdateData);
+                    transaction.set(dailyRecordRef, updatedDailyData, { merge: true });
+                });
+                
+                showAlert('Éxito', 'El registro ha sido ajustado correctamente.', 'success');
+                toggleModal(adjustmentDetailModal, false);
+                toggleModal(managementModal, false); 
+                
+            } catch (err) {
+                console.error("Error adjusting time:", err);
+                showAlert('Error', 'No se pudo realizar el ajuste.', 'error');
+            }
+        });
+
+        passwordForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const password = el('password').value;
+            if (password === 'GatoSandia@') {
+                toggleModal(passwordModal, false);
+                if (pendingAction.type === 'delete') {
+                    const worker = workersData.find(w => w.id === pendingAction.workerId);
+                    if (confirm(`¿Estás seguro de que quieres eliminar a ${worker.name}?`)) {
+                        deleteDoc(doc(db, `artifacts/${appId}/public/data/workers`, pendingAction.workerId))
+                            .then(() => showAlert('Eliminado', `${worker.name} fue eliminado.`, 'success'))
+                            .catch(() => showAlert('Error', 'No se pudo eliminar.', 'error'));
+                    }
+                } else if (pendingAction.type === 'edit') {
+                    const worker = workersData.find(w => w.id === pendingAction.workerId);
+                    el('edit-worker-id').value = worker.id;
+                    el('edit-name').value = worker.name;
+                    el('edit-role').value = worker.role;
+                    el('edit-dni').value = worker.dni;
+                    el('edit-email').value = worker.email;
+                    el('edit-hourlyRate').value = worker.hourlyRate;
+                    toggleModal(editWorkerModal, true);
+                } else if (pendingAction.type === 'management') {
+                    openManagementPanel();
+                }
+            } else {
+                showAlert('Error', 'Contraseña incorrecta.', 'error');
+            }
+            passwordForm.reset();
+            passwordInput.type = 'password';
+            passwordIcon.className = 'ph ph-eye';
+            pendingAction = { type: null, workerId: null };
+        });
+
+        function openManagementPanel() {
+            managementWorkerList.innerHTML = '';
+            adjustSelectedBtn.disabled = true;
+            const sortedWorkers = [...workersData].sort((a,b) => a.name.localeCompare(b.name));
+            sortedWorkers.forEach(worker => {
+                const item = document.createElement('div');
+                item.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg border';
+                item.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <input type="radio" name="management-selection" class="management-checkbox h-5 w-5 text-red-600" data-id="${worker.id}">
+                        <div>
+                            <p class="font-semibold">${worker.name}</p>
+                            <p class="text-xs text-gray-500">Horas: ${formatTime(worker.totalWorkSeconds || 0)} | Retraso: ${worker.accumulatedLateMinutes || 0} min</p>
+                        </div>
+                    </div>
+                `;
+                managementWorkerList.appendChild(item);
+            });
+            toggleModal(managementModal, true);
+        }
+        
+        managementWorkerList.addEventListener('change', () => {
+            const selectedCount = managementWorkerList.querySelectorAll('.management-checkbox:checked').length;
+            adjustSelectedBtn.disabled = selectedCount !== 1;
+        });
+
+        adjustSelectedBtn.addEventListener('click', async () => {
+            const selectedCheckbox = managementWorkerList.querySelector('.management-checkbox:checked');
+            if(selectedCheckbox) {
+                const workerId = selectedCheckbox.dataset.id;
+                const worker = workersData.find(w => w.id === workerId);
+                el('adjust-detail-worker-id').value = workerId;
+                el('adjust-detail-worker-name').textContent = worker.name;
+
+                const recordsRef = collection(db, `artifacts/${appId}/public/data/workers/${workerId}/dailyRecords`);
+                const recordsSnap = await getDocs(recordsRef);
+                const dates = new Set(recordsSnap.docs.map(doc => doc.id));
+                
+                const todayStr = dateToYYYYMMDD(new Date());
+                dates.add(todayStr);
+                
+                const sortedDates = Array.from(dates).sort().reverse();
+                
+                adjustmentDateSelector.innerHTML = '<option value="">Seleccione una fecha...</option>';
+                sortedDates.forEach(date => {
+                    const option = document.createElement('option');
+                    option.value = date;
+                    option.textContent = date;
+                    if (date === todayStr) {
+                        option.selected = true;
+                    }
+                    adjustmentDateSelector.appendChild(option);
+                });
+                
+                adjustmentDetailForm.reset();
+                el('adjust-lateness').value = worker.accumulatedLateMinutes || 0;
+                
+                await adjustmentDateSelector.dispatchEvent(new Event('change'));
+
+                toggleModal(adjustmentDetailModal, true);
+            }
+        });
+        
+        adjustmentDateSelector.addEventListener('change', async (e) => {
+            const dateStr = e.target.value;
+            const workerId = el('adjust-detail-worker-id').value;
+            if(!dateStr || !workerId) return;
+            const dailyRecord = await getOrCreateDailyRecord(workerId, dateStr);
+            el('adjust-check-in-1').value = timestampToHHMM(dailyRecord.checkInTimeTurn1);
+            el('adjust-check-out-1').value = timestampToHHMM(dailyRecord.checkOutTimeTurn1);
+            el('adjust-check-in-2').value = timestampToHHMM(dailyRecord.checkInTimeTurn2);
+            el('adjust-check-out-2').value = timestampToHHMM(dailyRecord.checkOutTimeTurn2);
+            el('adjust-attendance-status').value = dailyRecord.status || 'pending';
+        });
+        
+        workersTableBody.addEventListener('click', async (e) => { 
+            const deleteBtn = e.target.closest('.delete-worker-btn');
+            const editBtn = e.target.closest('.edit-worker-btn');
+            if (deleteBtn) {
+                pendingAction = { type: 'delete', workerId: deleteBtn.dataset.id };
+                passwordTitle.textContent = "Confirmar Eliminación";
+                toggleModal(passwordModal, true);
+            }
+            if (editBtn) {
+                pendingAction = { type: 'edit', workerId: editBtn.dataset.id };
+                passwordTitle.textContent = "Confirmar Edición";
+                toggleModal(passwordModal, true);
+            }
+        });
+
+        selectAllCheckbox.addEventListener('change', (e) => { document.querySelectorAll('.worker-checkbox').forEach(cb => cb.checked = e.target.checked); });
+        
+        async function handleReportGeneration(event, showToday = false) {
+            let startDate, endDate;
+            let reportType = Object.keys(tabs).find(key => tabs[key].classList.contains('tab-active'));
+            
+            if (showToday) {
+                reportType = 'diario';
+                const today = new Date();
+                startDate = dateToYYYYMMDD(today);
+                endDate = dateToYYYYMMDD(today);
+            } else {
+                 if(reportType === 'diario') {
+                    startDate = endDate = el('report-date-daily').value;
+                    if (!startDate) return showAlert('Error', 'Por favor, selecciona un día.', 'error');
+                } else if (reportType === 'mensual') {
+                    const monthValue = el('report-date-monthly').value;
+                    if(!monthValue) return showAlert('Error', 'Por favor, selecciona un mes.', 'error');
+                    const [year, month] = monthValue.split('-');
+                    startDate = `${year}-${month}-01`;
+                    const lastDay = new Date(year, month, 0).getDate();
+                    endDate = `${year}-${month}-${lastDay}`;
+                } else { 
+                    startDate = null;
+                    endDate = null;
+                }
+            }
+
+            try {
+                const reportData = await fetchReportData(startDate, endDate);
+                currentReportData = { range: { startDate, endDate }, data: reportData, type: reportType };
+                generateVisualReport(reportData, startDate, endDate, reportType);
+                if(showToday) toggleModal(reportModal, true);
+            } catch (error) {
+                console.error("Error generating report:", error);
+                showAlert('Error', 'No se pudo generar el reporte.', 'error');
+            }
+        }
+
+        async function fetchReportData(startDate, endDate) {
+             const reportData = [];
+             for (const worker of workersData) {
+                 const recordsRef = collection(db, `artifacts/${appId}/public/data/workers/${worker.id}/dailyRecords`);
+                 const recordsSnap = await getDocs(recordsRef);
+                 const records = [];
+                 recordsSnap.forEach(doc => {
+                     const docDate = doc.id;
+                     if (!startDate || (docDate >= startDate && docDate <= endDate)) {
+                         records.push(doc.data());
+                     }
+                 });
+                 if (records.length > 0) {
+                     reportData.push({ workerInfo: worker, records: records.sort((a,b) => a.date.localeCompare(b.date)) });
+                 }
+             }
+             return reportData;
+        }
+        
+        function generateVisualReport(reportData, startDate, endDate, type) {
+            let dateText;
+            if (type === 'diario') dateText = `Mostrando reporte para el día: ${startDate}`;
+            else if (type === 'mensual') dateText = `Mostrando reporte para el mes de: ${startDate.substring(0, 7)}`;
+            else dateText = `Mostrando reporte con todos los datos históricos`;
+
+            reportDateRange.textContent = dateText;
+            
+            if (reportData.length === 0) {
+                reportBody.innerHTML = '<p class="text-center text-gray-500 mt-8">No hay datos para el período seleccionado.</p>';
+                return;
+            }
+
+            let grandTotalPay = 0;
+            const workerReports = reportData.map(item => {
+                const { workerInfo, records } = item;
+                
+                let periodWorkSeconds = 0;
+                records.forEach(rec => periodWorkSeconds += (rec.workSeconds || 0));
+                
+                const periodPay = (periodWorkSeconds / 3600) * (workerInfo.hourlyRate || 0);
+                grandTotalPay += periodPay;
+                
+                return `
+                    <div class="p-4 border rounded-lg bg-gray-50 break-inside-avoid mb-4">
+                        <h3 class="text-xl font-bold">${workerInfo.name}</h3>
+                        <p class="text-sm text-gray-600 mb-4">${workerInfo.role} - DNI: ${workerInfo.dni || 'N/A'}</p>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                            <div><p class="text-xs uppercase">Horas en Período</p><p class="text-2xl font-semibold">${formatTime(periodWorkSeconds)}</p></div>
+                             <div><p class="text-xs uppercase">Minutos de Retraso (Total)</p><p class="text-2xl font-semibold">${workerInfo.accumulatedLateMinutes || 0}</p></div>
+                            <div><p class="text-xs uppercase">Pago en Período</p><p class="text-2xl font-semibold text-green-600">${formatCurrency(periodPay)}</p></div>
+                        </div>
+                    </div>`;
+            }).join('');
+
+            const totalSummaryHTML = `
+                <div class="p-6 mb-6 border-b-2 border-indigo-500 bg-indigo-50 rounded-lg">
+                    <h3 class="text-lg font-semibold text-gray-800 text-center">Total a Pagar en Período</h3>
+                    <p class="text-4xl font-bold text-indigo-600 text-center mt-2">${formatCurrency(grandTotalPay)}</p>
+                </div>
+            `;
+            reportBody.innerHTML = totalSummaryHTML + `<div class="space-y-6">` + workerReports + `</div>`;
+        }
+        
+        function generateAndDownloadCSV() {
+            if (!currentReportData.data || currentReportData.data.length === 0) {
+                return showAlert('Info', 'No hay datos en el reporte actual para descargar.', 'info');
+            }
+            const { range, data } = currentReportData;
+            
+            const headers = ["Fecha", "Obrero", "Estado Asistencia", "Entrada Mañana", "Salida Mañana", "Entrada Tarde", "Salida Tarde", "Horas del Día", "Pago del Día"];
+            const rows = [];
+            let grandTotalPay = 0;
+
+            data.forEach(item => {
+                item.records.forEach(record => {
+                    const dailyPay = (record.workSeconds / 3600) * (item.workerInfo.hourlyRate || 0);
+                    grandTotalPay += dailyPay;
+                    rows.push([
+                        `"${record.date}"`, `"${item.workerInfo.name}"`, `"${record.status || 'N/A'}"`, `"${timestampToHHMM(record.checkInTimeTurn1)}"`, `"${timestampToHHMM(record.checkOutTimeTurn1)}"`,
+                        `"${timestampToHHMM(record.checkInTimeTurn2)}"`, `"${timestampToHHMM(record.checkOutTimeTurn2)}"`, (record.workSeconds / 3600).toFixed(2), dailyPay.toFixed(2)
+                    ]);
+                });
+            });
+
+            const summaryRows = [
+                ["Reporte Desde", range.startDate || 'Inicio'],
+                ["Reporte Hasta", range.endDate || 'Fin'],
+                ["Costo Total del Periodo", grandTotalPay.toFixed(2)],
+                []
+            ];
+
+            const allRows = [...summaryRows, headers, ...rows];
+            const csvContent = allRows.map(e => e.join(",")).join("\n");
+            
+            const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            const fileName = `reporte_${range.startDate || 'total'}_a_${range.endDate || ''}.csv`;
+            link.setAttribute("href", url);
+            link.setAttribute("download", fileName);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            updateClock();
+            setInterval(updateClock, 60000); 
+            setInterval(() => {
+                workersData.forEach(w => updateWorkerRow(w.id));
+                updateGrandTotal();
+            }, 1000);
+            setInterval(handleDailyProcesses, 60000); 
+            authenticateUser();
+        });
 
     </script>
 </body>
