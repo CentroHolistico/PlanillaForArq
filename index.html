@@ -321,6 +321,7 @@
             total: el('tab-content-total'),
         };
         
+        // ... (el resto del código se mantiene igual hasta el final del script)
         function showAlert(title, message, type = 'info') {
             alertTitle.textContent = title;
             alertMessage.textContent = message;
@@ -638,15 +639,30 @@
         });
 
         async function handleDailyProcesses() {
-            // ... (mismo código)
+             // ...
         }
         
         addWorkerForm.addEventListener('submit', async (e) => { 
-            // ... (mismo código)
+            e.preventDefault(); 
+            const fd = new FormData(addWorkerForm); 
+            const today = new Date().toISOString().split('T')[0];
+            const newWorker = { name: fd.get('name'), role: fd.get('role'), dni: fd.get('dni'), email: fd.get('email'), hourlyRate: parseFloat(fd.get('hourlyRate')), checkedIn: false, lastCheckInTime: null, totalWorkSeconds: 0, accumulatedLateMinutes: 0, earlyDepartures: [], attendanceHistory: [], dailyStatus: { date: today, checkedInTurn1: false, checkedInTurn2: false, status: 'pending', checkInTimeTurn1: null, checkOutTimeTurn1: null, checkInTimeTurn2: null, checkOutTimeTurn2: null}, createdAt: serverTimestamp() }; 
+            try { 
+                await addDoc(collection(db, `artifacts/${appId}/public/data/workers`), newWorker); 
+                showAlert('Éxito', `${newWorker.name} ha sido agregado.`, 'success'); 
+                toggleModal(addWorkerModal, false); addWorkerForm.reset(); 
+            } catch (err) { console.error(err); showAlert('Error', 'No se pudo agregar al obrero.', 'error'); } 
         });
 
         editWorkerForm.addEventListener('submit', async (e) => {
-            // ... (mismo código)
+            e.preventDefault();
+            const workerId = el('edit-worker-id').value;
+            const updatedData = { name: el('edit-name').value, role: el('edit-role').value, dni: el('edit-dni').value, email: el('edit-email').value, hourlyRate: parseFloat(el('edit-hourlyRate').value) };
+            try {
+                await updateDoc(doc(db, `artifacts/${appId}/public/data/workers`, workerId), updatedData);
+                showAlert('Éxito', 'Los datos del obrero han sido actualizados.', 'success');
+                toggleModal(editWorkerModal, false);
+            } catch (err) { console.error(err); showAlert('Error', 'No se pudieron actualizar los datos.', 'error'); }
         });
 
         adjustmentDetailForm.addEventListener('submit', async (e) => {
@@ -654,7 +670,6 @@
             const workerId = el('adjust-detail-worker-id').value;
             const dateStr = el('adjustment-date-selector').value;
             if (!dateStr) return showAlert('Error', 'Debe seleccionar una fecha para ajustar.', 'error');
-
             const dateForTimestamp = new Date(dateStr.replace(/-/g, '/'));
             
             const timeToTimestamp = (timeStr) => {
@@ -693,8 +708,7 @@
                     const newTotalWorkSeconds = oldTotalWorkSeconds + workSecondsDelta;
                     
                     const updatedDailyData = {
-                        date: dateStr,
-                        workSeconds: newDailyWorkSeconds,
+                        date: dateStr, workSeconds: newDailyWorkSeconds,
                         checkInTimeTurn1: t_in1, checkOutTimeTurn1: t_out1,
                         checkInTimeTurn2: t_in2, checkOutTimeTurn2: t_out2,
                         status: el('adjust-attendance-status').value
@@ -786,7 +800,13 @@
 
                 const recordsRef = collection(db, `artifacts/${appId}/public/data/workers/${workerId}/dailyRecords`);
                 const recordsSnap = await getDocs(recordsRef);
-                const dates = recordsSnap.docs.map(doc => doc.id).sort().reverse();
+                const dates = recordsSnap.docs.map(doc => doc.id);
+                
+                const todayStr = dateToYYYYMMDD(new Date());
+                if (!dates.includes(todayStr)) {
+                    dates.push(todayStr);
+                }
+                dates.sort().reverse();
                 
                 adjustmentDateSelector.innerHTML = '<option value="">Seleccione una fecha...</option>';
                 dates.forEach(date => {
@@ -985,4 +1005,3 @@
     </script>
 </body>
 </html>
-
