@@ -39,7 +39,7 @@
                     <p id="current-date" class="text-gray-500 text-sm md:text-base">Cargando...</p>
                 </div>
                 <div class="text-center md:text-right mt-4 md:mt-0">
-                    <p class="text-xs text-gray-400">ID de Sesión (para compartir):</p>
+                    <p class="text-xs text-gray-400">ID de Sesión:</p>
                     <p id="user-id" class="text-sm font-mono bg-gray-100 px-2 py-1 rounded">Cargando...</p>
                 </div>
             </div>
@@ -53,7 +53,7 @@
             <button id="create-report-btn" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg shadow-sm transition-transform transform hover:scale-105 flex items-center justify-center space-x-2"><i class="ph ph-file-text"></i><span>Crear Reporte</span></button>
         </div>
 
-        <!-- **NUEVO** Resumen de Totales -->
+        <!-- Resumen de Totales -->
         <div class="mb-6 p-4 bg-white rounded-lg shadow-md no-print">
             <h2 class="text-lg font-semibold text-gray-700 mb-2">Resumen General</h2>
             <div class="flex justify-between items-center">
@@ -115,11 +115,20 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, collection, addDoc, onSnapshot, updateDoc, deleteDoc, serverTimestamp, Timestamp, writeBatch, arrayUnion, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, addDoc, onSnapshot, updateDoc, deleteDoc, serverTimestamp, Timestamp, writeBatch, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-timesheet-app';
+        // Configuración de tu proyecto de Firebase
+        const firebaseConfig = {
+          apiKey: "AIzaSyBmqG6_pD7OzSGhOaZSRc4IVfXwNaADE8U",
+          authDomain: "planilla-c17ab.firebaseapp.com",
+          projectId: "planilla-c17ab",
+          storageBucket: "planilla-c17ab.appspot.com",
+          messagingSenderId: "993902505533",
+          appId: "1:993902505533:web:9154f4bd2c95e088c78454"
+        };
+        
+        const appId = 'planilla-c17ab'; // Usamos el ID de tu proyecto para las rutas
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -137,7 +146,7 @@
         const createReportBtn = el('create-report-btn');
         const currentDateEl = el('current-date');
         const userIdEl = el('user-id');
-        const grandTotalDisplay = el('grand-total-display'); // Nuevo elemento
+        const grandTotalDisplay = el('grand-total-display');
         const addWorkerModal = el('add-worker-modal');
         const cancelAddWorkerBtn = el('cancel-add-worker');
         const addWorkerForm = el('add-worker-form');
@@ -227,8 +236,24 @@
         });
         cancelEarlyCheckoutBtn.addEventListener('click', () => { toggleModal(earlyCheckoutModal, false); earlyCheckoutForm.reset(); });
 
-        onAuthStateChanged(auth, user => { if (user) { currentUserId = user.uid; userIdEl.textContent = currentUserId; listenToWorkers(); } });
-        async function authenticateUser() { try { const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; await (token ? signInWithCustomToken(auth, token) : signInAnonymously(auth)); } catch (error) { console.error(error); showAlert('Error', 'No se pudo autenticar.', 'error'); } }
+        auth.onAuthStateChanged(user => { if (user) { currentUserId = user.uid; userIdEl.textContent = currentUserId.substring(0, 8); listenToWorkers(); } });
+        
+        async function authenticateUser() {
+            try {
+                await signInAnonymously(auth);
+            } catch (error) {
+                console.error("Authentication Error:", error);
+                if (error.code === 'auth/configuration-not-found') {
+                     showAlert(
+                        'Error de Configuración de Firebase', 
+                        'El inicio de sesión anónimo no está habilitado. Ve a tu Consola de Firebase > Authentication > Sign-in method y activa el proveedor "Anónimo".', 
+                        'error'
+                    );
+                } else {
+                    showAlert('Error de Autenticación', 'No se pudo conectar. Revisa la configuración de Firebase y tu conexión a internet.', 'error');
+                }
+            }
+        }
         
         function listenToWorkers() {
             const workersCollection = collection(db, `artifacts/${appId}/public/data/workers`);
@@ -311,7 +336,6 @@
             row.querySelector('.pay-cell').textContent = formatCurrency(totalPay);
         }
 
-        // **NUEVA FUNCIÓN** para calcular y mostrar el total general
         function updateGrandTotal() {
             const now = new Date();
             let grandTotal = 0;
@@ -549,7 +573,7 @@
             setInterval(updateClock, 60000); 
             setInterval(() => {
                 workersData.forEach(w => updateWorkerRow(w.id));
-                updateGrandTotal(); // Actualiza el total general cada segundo
+                updateGrandTotal();
             }, 1000);
             setInterval(handleDailyProcesses, 60000); 
             authenticateUser();
