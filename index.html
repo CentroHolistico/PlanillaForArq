@@ -134,7 +134,7 @@
         const db = getFirestore(app);
         let currentUserId = null;
         let workersData = [];
-        let dailyProcessFlags = { noon: false, evening: false };
+        let dailyProcessFlags = { morning: false, evening: false };
 
         const el = (id) => document.getElementById(id);
         const workersTableBody = el('workers-table-body');
@@ -357,12 +357,17 @@
 
             const hours = now.getHours();
             
-            if (hours >= 8 && hours < 12 && !dailyStatus.checkedInTurn1) {
-                const shift1Start = new Date(now); shift1Start.setHours(8, 0, 0, 0);
+            // Turno Mañana (7:30 a 11:30)
+            const shift1Start = new Date(now); shift1Start.setHours(7, 30, 0, 0);
+            const shift1End = new Date(now); shift1End.setHours(11, 30, 0, 0);
+            if (now >= shift1Start && now < shift1End && !dailyStatus.checkedInTurn1) {
                 return Math.max(0, Math.floor((now - shift1Start) / 60000));
             }
-            if (hours >= 14 && hours < 18 && !dailyStatus.checkedInTurn2) {
-                const shift2Start = new Date(now); shift2Start.setHours(14, 0, 0, 0);
+
+            // Turno Tarde (14:00 a 18:00)
+            const shift2Start = new Date(now); shift2Start.setHours(14, 0, 0, 0);
+            const shift2End = new Date(now); shift2End.setHours(18, 0, 0, 0);
+            if (now >= shift2Start && now < shift2End && !dailyStatus.checkedInTurn2) {
                 return Math.max(0, Math.floor((now - shift2Start) / 60000));
             }
             return 0;
@@ -377,7 +382,7 @@
             const now = new Date();
             const todayStr = now.toISOString().split('T')[0];
             const hours = now.getHours();
-            const isTurn1 = hours >= 8 && hours < 13;
+            const isTurn1 = hours >= 7 && hours < 13;
             const isTurn2 = hours >= 13 && hours < 18;
 
             for (const id of selectedIds) {
@@ -439,11 +444,14 @@
             const minutes = now.getMinutes();
 
             // Auto Checkout
-            const noonCheckout = hours === 12 && minutes === 0;
+            const morningCheckout = hours === 11 && minutes === 30;
             const eveningCheckout = hours === 18 && minutes === 0;
-            if ((noonCheckout || eveningCheckout) && workersData.some(w => w.checkedIn)) {
+            if ((morningCheckout || eveningCheckout) && workersData.some(w => w.checkedIn)) {
                 const batch = writeBatch(db);
-                const checkoutTime = new Date(now); checkoutTime.setMinutes(0,0,0);
+                const checkoutTime = new Date(now); 
+                if (morningCheckout) checkoutTime.setHours(11, 30, 0, 0);
+                if (eveningCheckout) checkoutTime.setHours(18, 0, 0, 0);
+
                 workersData.filter(w=>w.checkedIn).forEach(worker => {
                     const sessionSeconds = (checkoutTime.getTime() - worker.lastCheckInTime.toDate().getTime()) / 1000;
                     batch.update(doc(db, `artifacts/${appId}/public/data/workers`, worker.id), {
@@ -456,10 +464,10 @@
             }
 
             // Absence Processing
-            const noonAbsenceCheck = hours === 12 && minutes >= 1 && !dailyProcessFlags.noon;
+            const morningAbsenceCheck = hours === 11 && minutes >= 31 && !dailyProcessFlags.morning;
             const eveningAbsenceCheck = hours === 18 && minutes >= 1 && !dailyProcessFlags.evening;
 
-            if (noonAbsenceCheck || eveningAbsenceCheck) {
+            if (morningAbsenceCheck || eveningAbsenceCheck) {
                 const batch = writeBatch(db);
                 for(const worker of workersData) {
                     const workerRef = doc(db, `artifacts/${appId}/public/data/workers`, worker.id);
@@ -467,7 +475,7 @@
 
                     if (daily.date !== todayStr) continue;
 
-                    if (noonAbsenceCheck && !daily.checkedInTurn1) {
+                    if (morningAbsenceCheck && !daily.checkedInTurn1) {
                         batch.update(workerRef, { "dailyStatus.status": "half-absence" });
                     }
                     if (eveningAbsenceCheck) {
@@ -479,12 +487,12 @@
                     }
                 }
                 await batch.commit();
-                if(noonAbsenceCheck) dailyProcessFlags.noon = true;
+                if(morningAbsenceCheck) dailyProcessFlags.morning = true;
                 if(eveningAbsenceCheck) dailyProcessFlags.evening = true;
             }
 
             // Reset flags and daily status for the new day
-            if (hours === 0 && (dailyProcessFlags.noon || dailyProcessFlags.evening)) {
+            if (hours === 0 && (dailyProcessFlags.morning || dailyProcessFlags.evening)) {
                  const batch = writeBatch(db);
                  workersData.forEach(worker => {
                      const workerRef = doc(db, `artifacts/${appId}/public/data/workers`, worker.id);
@@ -496,7 +504,7 @@
                     });
                  });
                  await batch.commit();
-                 dailyProcessFlags = { noon: false, evening: false };
+                 dailyProcessFlags = { morning: false, evening: false };
                  console.log("Daily status reset for new day.");
             }
         }
