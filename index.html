@@ -177,38 +177,17 @@
     </div>
     <div id="report-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-hidden modal-backdrop bg-black bg-opacity-50">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-6xl modal-content modal-content-hidden flex flex-col" style="height: 90vh;">
-            <div id="report-content" class="p-6 md:p-8 overflow-y-auto flex-grow">
-                <h2 class="text-3xl font-bold mb-2">Reporte de Personal</h2>
-                <p id="report-date-range" class="text-gray-500 mb-6"></p>
-                <div id="report-body"></div>
+            <div class="p-6 border-b flex justify-between items-center no-print">
+                 <div>
+                    <h2 class="text-3xl font-bold">Reporte General</h2>
+                    <p id="report-date-range" class="text-gray-500"></p>
+                </div>
+                <button type="button" id="close-report-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">Cerrar</button>
             </div>
-            <div class="p-4 bg-gray-100 border-t no-print">
-                <h3 class="font-semibold mb-3">Generar Otro Reporte</h3>
-                 <div class="border-b border-gray-200 mb-4">
-                    <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                        <button id="tab-diario" type="button" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm tab-active">Diario</button>
-                        <button id="tab-mensual" type="button" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">Mensual</button>
-                        <button id="tab-total" type="button" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">Total</button>
-                    </nav>
-                </div>
-                <div id="tab-content-diario">
-                    <label for="report-date-daily" class="block text-sm font-bold mb-2">Seleccionar Día:</label>
-                    <input type="date" id="report-date-daily" class="shadow-sm border rounded w-full md:w-1/3 py-2 px-3">
-                </div>
-                 <div id="tab-content-mensual" class="hidden">
-                    <label for="report-date-monthly" class="block text-sm font-bold mb-2">Seleccionar Mes:</label>
-                    <input type="month" id="report-date-monthly" class="shadow-sm border rounded w-full md:w-1/3 py-2 px-3">
-                </div>
-                 <div id="tab-content-total" class="hidden">
-                    <p class="text-sm text-gray-600">Se generará un reporte con todos los datos históricos.</p>
-                </div>
-                <div class="flex justify-end space-x-2 mt-4">
-                    <button type="button" id="generate-new-report-btn" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg">Generar Reporte</button>
-                    <button type="button" id="download-csv-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg"><i class="ph ph-file-csv"></i></button>
-                </div>
+            <div id="report-body" class="p-6 md:p-8 overflow-y-auto flex-grow">
             </div>
-            <div class="p-4 bg-gray-50 border-t flex justify-end">
-                <button type="button" id="close-report-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">Cerrar</button>
+            <div class="p-4 bg-gray-50 border-t flex justify-end space-x-4 no-print">
+                 <button type="button" id="download-csv-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg flex items-center space-x-2"><i class="ph ph-file-csv"></i><span>Descargar CSV</span></button>
             </div>
         </div>
     </div>
@@ -221,7 +200,6 @@
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, collection, getDocs, onSnapshot, updateDoc, deleteDoc, serverTimestamp, Timestamp, writeBatch, arrayUnion, runTransaction, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Configuración de tu proyecto de Firebase
         const firebaseConfig = {
           apiKey: "AIzaSyBmqG6_pD7OzSGhOaZSRc4IVfXwNaADE8U",
           authDomain: "planilla-c17ab.firebaseapp.com",
@@ -281,7 +259,6 @@
         const adjustmentDetailForm = el('adjustment-detail-form');
         const adjustmentDateSelector = el('adjustment-date-selector');
         const reportModal = el('report-modal');
-        const generateNewReportBtn = el('generate-new-report-btn');
         const downloadCsvBtn = el('download-csv-btn');
         const alertModal = el('alert-modal');
         const alertOkBtn = el('alert-ok-btn');
@@ -291,16 +268,6 @@
         const closeReportBtn = el('close-report-btn');
         const reportDateRange = el('report-date-range');
         const reportBody = el('report-body');
-        const tabs = {
-            diario: el('tab-diario'),
-            mensual: el('tab-mensual'),
-            total: el('tab-total'),
-        };
-        const tabContents = {
-            diario: el('tab-content-diario'),
-            mensual: el('tab-content-mensual'),
-            total: el('tab-content-total'),
-        };
         
         function showAlert(title, message, type = 'info') {
             alertTitle.textContent = title;
@@ -320,7 +287,6 @@
         function formatCurrency(amount) {
             return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount || 0);
         }
-        
         function dateToYYYYMMDD(date) {
             return date.toISOString().split('T')[0];
         }
@@ -346,14 +312,12 @@
             }
         }
         
-        // Listeners
         addWorkerBtn.addEventListener('click', () => toggleModal(addWorkerModal, true));
         cancelAddWorkerBtn.addEventListener('click', () => { toggleModal(addWorkerModal, false); addWorkerForm.reset(); });
         cancelEditWorkerBtn.addEventListener('click', () => { toggleModal(editWorkerModal, false); editWorkerForm.reset(); });
         cancelPasswordBtn.addEventListener('click', () => { toggleModal(passwordModal, false); passwordForm.reset(); });
         cancelAdjustmentDetailBtn.addEventListener('click', () => { toggleModal(adjustmentDetailModal, false); });
-        createReportBtn.addEventListener('click', () => handleReportGeneration(null, true));
-        generateNewReportBtn.addEventListener('click', () => handleReportGeneration(null, false));
+        createReportBtn.addEventListener('click', () => generateReport());
         downloadCsvBtn.addEventListener('click', () => generateAndDownloadCSV());
         closeReportBtn.addEventListener('click', () => toggleModal(reportModal, false));
         
@@ -361,6 +325,7 @@
             const activeWorkers = workersData.filter(w => w.checkedIn);
             if (activeWorkers.length === 0) return showAlert('Información', 'No hay ningún obrero en turno.', 'info');
             earlyCheckoutWorkerList.innerHTML = '';
+            selectAllEarlyCheckout.checked = false;
             activeWorkers.forEach(worker => {
                 const item = document.createElement('label');
                 item.className = 'flex items-center p-2 rounded-md hover:bg-gray-100 cursor-pointer';
@@ -454,7 +419,7 @@
                 dailyWorkSeconds += sessionSeconds;
                 row.className = 'bg-green-100 border-b status-pulse';
             } else {
-                row.className = workersData.findIndex(w => w.id === workerId) % 2 === 0 ? 'bg-white border-b' : 'bg-gray-50 border-b';
+                row.className = workersData.findIndex((w, i) => w.id === workerId) % 2 === 0 ? 'bg-white border-b' : 'bg-gray-50 border-b';
             }
             
             const totalPay = (totalWorkDuration / 3600) * (worker.hourlyRate || 0);
@@ -533,7 +498,7 @@
              const newDailyWorkSeconds = (dailyRecord.workSeconds || 0) + sessionSeconds;
              
              await updateDoc(workerRef, { checkedIn: false, lastCheckInTime: null, totalWorkSeconds: newTotalWorkSeconds });
-             await setDoc(dailyRecordRef, { workSeconds: newDailyWorkSeconds }, { merge: true });
+             await setDoc(dailyRecordRef, { workSeconds: newDailyWorkSeconds, date: todayStr }, { merge: true });
         }
         
         earlyCheckoutForm.addEventListener('submit', async (e) => {
@@ -624,9 +589,9 @@
                     
                     const workerDoc = await transaction.get(workerRef);
                     if (!workerDoc.exists()) throw "Worker not found!";
-                    const dailyDoc = await getOrCreateDailyRecord(workerId, dateStr);
-
-                    const oldDailyWorkSeconds = dailyDoc.workSeconds || 0;
+                    const dailyDocSnap = await transaction.get(dailyRecordRef);
+                    const oldDailyWorkSeconds = dailyDocSnap.exists() ? (dailyDocSnap.data().workSeconds || 0) : 0;
+                    
                     const workSecondsDelta = newDailyWorkSeconds - oldDailyWorkSeconds;
                     const newTotalWorkSeconds = (workerDoc.data().totalWorkSeconds || 0) + workSecondsDelta;
                     
@@ -768,38 +733,13 @@
 
         selectAllCheckbox.addEventListener('change', (e) => { document.querySelectorAll('.worker-checkbox').forEach(cb => cb.checked = e.target.checked); });
         
-        async function handleReportGeneration(event, showToday = false) {
-            let startDate, endDate;
-            let reportType = Object.keys(tabs).find(key => tabs[key].classList.contains('tab-active'));
-            
-            if (showToday) {
-                reportType = 'diario';
-                const today = new Date();
-                startDate = dateToYYYYMMDD(today);
-                endDate = dateToYYYYMMDD(today);
-            } else {
-                 if(reportType === 'diario') {
-                    startDate = endDate = el('report-date-daily').value;
-                    if (!startDate) return showAlert('Error', 'Por favor, selecciona un día.', 'error');
-                } else if (reportType === 'mensual') {
-                    const monthValue = el('report-date-monthly').value;
-                    if(!monthValue) return showAlert('Error', 'Por favor, selecciona un mes.', 'error');
-                    const [year, month] = monthValue.split('-');
-                    startDate = `${year}-${month}-01`;
-                    const lastDay = new Date(year, month, 0).getDate();
-                    endDate = `${year}-${month}-${lastDay}`;
-                } else { 
-                    startDate = null;
-                    endDate = null;
-                }
-            }
-
+        async function generateReport() {
             try {
-                const reportData = await fetchReportData(startDate, endDate);
-                currentReportData = { range: { startDate, endDate }, data: reportData, type: reportType };
-                generateVisualReport(reportData, startDate, endDate, reportType);
-                if(showToday) toggleModal(reportModal, true);
-            } catch (error) {
+                const reportData = await fetchReportData(null, null); // Fetch all data
+                currentReportData = { range: { startDate: null, endDate: null }, data: reportData, type: 'total' };
+                generateVisualReport(reportData, null, null, 'total');
+                toggleModal(reportModal, true);
+            } catch(error) {
                 console.error("Error generating report:", error);
                 showAlert('Error', 'No se pudo generar el reporte.', 'error');
             }
@@ -825,15 +765,11 @@
         }
         
         function generateVisualReport(reportData, startDate, endDate, type) {
-            let dateText;
-            if (type === 'diario') dateText = `Mostrando reporte para el día: ${startDate}`;
-            else if (type === 'mensual') dateText = `Mostrando reporte para el mes de: ${startDate.substring(0, 7)}`;
-            else dateText = `Mostrando reporte con todos los datos históricos`;
-
+            let dateText = 'Mostrando reporte con todos los datos históricos';
             reportDateRange.textContent = dateText;
             
             if (reportData.length === 0) {
-                reportBody.innerHTML = '<p class="text-center text-gray-500 mt-8">No hay datos para el período seleccionado.</p>';
+                reportBody.innerHTML = '<p class="text-center text-gray-500 mt-8">No hay datos para generar un reporte.</p>';
                 return;
             }
 
