@@ -24,7 +24,7 @@
 </head>
 <body class="p-4 md:p-8">
 
-    <div id="app" class="max-w-7xl mx-auto">
+    <div id="app" class="max-w-6xl mx-auto">
         <!-- Encabezado -->
         <header class="mb-8 p-4 bg-white rounded-lg shadow-md no-print">
             <div class="flex flex-col md:flex-row justify-between items-center">
@@ -63,14 +63,14 @@
                 <thead class="text-xs text-gray-700 uppercase bg-gray-100 no-print">
                     <tr>
                         <th scope="col" class="p-4"><input type="checkbox" id="select-all-checkbox" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded"></th>
-                        <th scope="col" class="px-6 py-3">Obrero</th>
-                        <th scope="col" class="px-6 py-3">Categoría</th>
-                        <th scope="col" class="px-6 py-3">Estado / Retraso</th>
-                        <th scope="col" class="px-6 py-3 text-center">Horas del Día</th>
-                        <th scope="col" class="px-6 py-3 text-center">Horas Totales</th>
-                        <th scope="col" class="px-6 py-3 text-right">Precio / Hr</th>
-                        <th scope="col" class="px-6 py-3 text-right">Total Acumulado</th>
-                        <th scope="col" class="px-6 py-3 text-center">Acciones</th>
+                        <th scope="col" class="px-4 py-3">Obrero</th>
+                        <th scope="col" class="px-4 py-3">Categoría</th>
+                        <th scope="col" class="px-4 py-3 text-center">Estado</th>
+                        <th scope="col" class="px-4 py-3 text-center">Horas del Día</th>
+                        <th scope="col" class="px-4 py-3 text-center">Horas Totales</th>
+                        <th scope="col" class="px-4 py-3 text-right">Precio / Hr</th>
+                        <th scope="col" class="px-4 py-3 text-right">Total Acumulado</th>
+                        <th scope="col" class="px-4 py-3 text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody id="workers-table-body">
@@ -139,49 +139,16 @@
                     </div>
                 </div>
                 <input type="hidden" id="adjust-detail-worker-id">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                    <div class="p-4 border rounded-lg">
-                        <h3 class="font-bold mb-3">Turno Mañana (07:30 - 11:30)</h3>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label for="adjust-check-in-1" class="block text-sm font-bold mb-2">Ingreso (HH:MM)</label>
-                                <input type="time" id="adjust-check-in-1" class="shadow border rounded w-full py-2 px-3">
-                            </div>
-                            <div>
-                                <label for="adjust-check-out-1" class="block text-sm font-bold mb-2">Salida (HH:MM)</label>
-                                <input type="time" id="adjust-check-out-1" class="shadow border rounded w-full py-2 px-3">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="p-4 border rounded-lg">
-                        <h3 class="font-bold mb-3">Turno Tarde (14:00 - 18:00)</h3>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label for="adjust-check-in-2" class="block text-sm font-bold mb-2">Ingreso (HH:MM)</label>
-                                <input type="time" id="adjust-check-in-2" class="shadow border rounded w-full py-2 px-3">
-                            </div>
-                            <div>
-                                <label for="adjust-check-out-2" class="block text-sm font-bold mb-2">Salida (HH:MM)</label>
-                                <input type="time" id="adjust-check-out-2" class="shadow border rounded w-full py-2 px-3">
-                            </div>
-                        </div>
-                    </div>
-                </div>
                 <div class="mt-6 p-4 border rounded-lg">
                     <h3 class="font-bold mb-3">Ajustes Generales</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label for="adjust-lateness" class="block text-sm font-bold mb-2">Total Minutos de Retraso</label>
-                            <input type="number" id="adjust-lateness" class="shadow border rounded w-full py-2 px-3">
+                            <label for="adjust-hours-day" class="block text-sm font-bold mb-2">Horas del Día (HH:MM)</label>
+                            <input type="text" id="adjust-hours-day" placeholder="Ej: 08:30" class="shadow border rounded w-full py-2 px-3">
                         </div>
                         <div>
-                             <label for="adjust-attendance-status" class="block text-sm font-bold mb-2">Estado de Asistencia</label>
-                             <select id="adjust-attendance-status" class="shadow border rounded w-full py-2 px-3">
-                                <option value="pending">Pendiente</option>
-                                <option value="present">Presente</option>
-                                <option value="half-absence">Media Falta</option>
-                                <option value="full-absence">Falta Completa</option>
-                             </select>
+                            <label for="adjust-lateness" class="block text-sm font-bold mb-2">Total Minutos de Retraso</label>
+                            <input type="number" id="adjust-lateness" class="shadow border rounded w-full py-2 px-3">
                         </div>
                     </div>
                 </div>
@@ -243,6 +210,7 @@
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, collection, getDocs, onSnapshot, updateDoc, deleteDoc, serverTimestamp, Timestamp, writeBatch, arrayUnion, runTransaction, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // Configuración de tu proyecto de Firebase
         const firebaseConfig = {
           apiKey: "AIzaSyBmqG6_pD7OzSGhOaZSRc4IVfXwNaADE8U",
           authDomain: "planilla-c17ab.firebaseapp.com",
@@ -340,15 +308,6 @@
         function formatCurrency(amount) {
             return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount || 0);
         }
-        function formatLatenessString(totalMinutes) {
-            if (!totalMinutes || totalMinutes <= 0) return '';
-            const hours = Math.floor(totalMinutes / 60);
-            const minutes = totalMinutes % 60;
-            let result = 'RETRASO: ';
-            if (hours > 0) result += `${hours} h `;
-            if (minutes > 0) result += `${minutes} min`;
-            return result.trim();
-        }
         function timestampToHHMM(timestamp) {
             if (!timestamp) return '';
             const date = timestamp.toDate();
@@ -432,8 +391,7 @@
             const workersCollection = collection(db, `artifacts/${appId}/public/data/workers`);
             onSnapshot(workersCollection, (snapshot) => { 
                 loadingRow.style.display = 'none'; 
-                const newWorkersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                workersData = newWorkersData;
+                workersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderWorkersTable();
             }, (error) => { console.error(error); showAlert('Error', 'No se pudo obtener la lista.', 'error'); });
         }
@@ -441,32 +399,29 @@
         async function renderWorkersTable() {
             const checkedIds = new Set(Array.from(document.querySelectorAll('.worker-checkbox:checked')).map(cb => cb.dataset.id));
             workersTableBody.innerHTML = '';
-            if (workersData.length === 0) { workersTableBody.innerHTML = `<tr><td colspan="9" class="text-center p-8"><div class="text-gray-500"><i class="ph ph-users text-4xl mb-2"></i><p class="font-semibold">No hay personal.</p></div></td></tr>`; return; }
+            if (workersData.length === 0) { workersTableBody.innerHTML = `<tr><td colspan="8" class="text-center p-8"><div class="text-gray-500"><i class="ph ph-users text-4xl mb-2"></i><p class="font-semibold">No hay personal.</p></div></td></tr>`; return; }
             const sortedWorkers = [...workersData].sort((a, b) => a.name.localeCompare(b.name));
-            
             for (const [index, worker] of sortedWorkers.entries()) {
                 const row = document.createElement('tr');
-                const bgColorClass = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
-                row.className = `${bgColorClass} border-b hover:bg-blue-100`;
-                row.dataset.workerId = worker.id;
                 const isChecked = checkedIds.has(worker.id) ? 'checked' : '';
+                row.dataset.workerId = worker.id;
                 row.innerHTML = `
                     <td class="p-4"><input type="checkbox" class="worker-checkbox w-4 h-4 text-blue-600 rounded" data-id="${worker.id}" ${isChecked}></td>
-                    <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">${worker.name}<div class="text-xs text-gray-500">${worker.dni || 'N/A'}</div></td>
-                    <td class="px-6 py-4">${worker.role}</td>
-                    <td class="px-6 py-4 status-cell"></td>
-                    <td class="px-6 py-4 text-center font-mono text-base daily-duration-cell">00:00</td>
-                    <td class="px-6 py-4 text-center font-mono text-base total-duration-cell">00:00</td>
-                    <td class="px-6 py-4 text-right">${formatCurrency(worker.hourlyRate)}</td>
-                    <td class="px-6 py-4 text-right font-bold text-blue-600 pay-cell">${formatCurrency(0)}</td>
-                    <td class="px-6 py-4 text-center">
+                    <td class="px-4 py-4 font-medium text-gray-900 whitespace-nowrap">${worker.name}<div class="text-xs text-gray-500">${worker.dni || 'N/A'}</div></td>
+                    <td class="px-4 py-3">${worker.role}</td>
+                    <td class="px-4 py-3 text-center status-cell"></td>
+                    <td class="px-4 py-3 text-center font-mono text-base daily-duration-cell">00:00</td>
+                    <td class="px-4 py-3 text-center font-mono text-base total-duration-cell">00:00</td>
+                    <td class="px-4 py-3 text-right">${formatCurrency(worker.hourlyRate)}</td>
+                    <td class="px-4 py-3 text-right font-bold text-blue-600 pay-cell">${formatCurrency(0)}</td>
+                    <td class="px-4 py-3 text-center">
                         <div class="flex items-center justify-center space-x-3">
                             <button class="edit-worker-btn text-blue-500 hover:text-blue-700" data-id="${worker.id}" title="Editar Obrero"><i class="ph ph-pencil-simple text-lg"></i></button>
                             <button class="delete-worker-btn text-red-500 hover:text-red-700" data-id="${worker.id}" title="Eliminar Obrero"><i class="ph ph-trash text-lg"></i></button>
                         </div>
                     </td>`;
                 workersTableBody.appendChild(row);
-                updateWorkerRow(worker.id);
+                await updateWorkerRow(worker.id);
             }
         }
         
@@ -478,39 +433,27 @@
             const now = new Date();
             const todayStr = dateToYYYYMMDD(now);
             let totalWorkDuration = worker.totalWorkSeconds || 0;
-            let statusHtml;
-
+            
             const dailyRecord = await getOrCreateDailyRecord(workerId, todayStr);
             let dailyWorkSeconds = dailyRecord.workSeconds || 0;
-
+            
             if (worker.checkedIn && worker.lastCheckInTime) {
                 const sessionSeconds = (now.getTime() - worker.lastCheckInTime.toDate().getTime()) / 1000;
                 totalWorkDuration += sessionSeconds;
                 dailyWorkSeconds += sessionSeconds;
-                statusHtml = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-200 text-green-800 status-pulse">EN TURNO</span>';
+                row.className = 'bg-green-100 border-b';
+                row.querySelector('.status-cell').innerHTML = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-200 text-green-800 status-pulse">EN TURNO</span>`;
             } else {
-                 if (dailyRecord.status === 'full-absence') {
-                     statusHtml = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-200 text-red-800">FALTA COMPLETA</span>';
-                 } else if(dailyRecord.status === 'half-absence') {
-                     statusHtml = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-200 text-yellow-800">MEDIA FALTA</span>';
-                 } else {
-                    const lateMinutes = calculateLateness(worker, now);
-                    if (lateMinutes > 0) {
-                        statusHtml = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-200 text-yellow-800">${formatLatenessString(lateMinutes)}</span>`;
-                    } else {
-                        statusHtml = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-200 text-gray-800">AUSENTE</span>';
-                    }
-                }
+                row.className = workersData.findIndex(w => w.id === workerId) % 2 === 0 ? 'bg-white border-b' : 'bg-gray-50 border-b';
+                row.querySelector('.status-cell').innerHTML = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-200 text-gray-800">AUSENTE</span>`;
             }
             
             const totalPay = (totalWorkDuration / 3600) * (worker.hourlyRate || 0);
             
-            row.querySelector('.status-cell').innerHTML = statusHtml;
             row.querySelector('.daily-duration-cell').textContent = formatTime(dailyWorkSeconds);
             row.querySelector('.total-duration-cell').textContent = formatTime(totalWorkDuration);
             row.querySelector('.pay-cell').textContent = formatCurrency(totalPay);
         }
-
 
         function updateGrandTotal() {
             const now = new Date();
@@ -525,25 +468,6 @@
             grandTotalDisplay.textContent = formatCurrency(grandTotal);
         }
 
-        function calculateLateness(worker, now) {
-            const todayStr = dateToYYYYMMDD(now);
-            const dailyStatus = worker.dailyStatus;
-            if (worker.checkedIn || !dailyStatus || dailyStatus.date !== todayStr) return 0;
-            const hours = now.getHours();
-            
-            const shift1Start = new Date(now); shift1Start.setHours(7, 30, 0, 0);
-            const shift1End = new Date(now); shift1End.setHours(11, 30, 0, 0);
-            if (now >= shift1Start && now < shift1End && !dailyStatus.checkedInTurn1) {
-                return Math.max(0, Math.floor((now - shift1Start) / 60000));
-            }
-            const shift2Start = new Date(now); shift2Start.setHours(14, 0, 0, 0);
-            const shift2End = new Date(now); shift2End.setHours(18, 0, 0, 0);
-            if (now >= shift2Start && now < shift2End && !dailyStatus.checkedInTurn2) {
-                return Math.max(0, Math.floor((now - shift2Start) / 60000));
-            }
-            return 0;
-        }
-
         async function getOrCreateDailyRecord(workerId, dateStr) {
             if (dailyRecordsCache[workerId] && dailyRecordsCache[workerId][dateStr]) {
                 return dailyRecordsCache[workerId][dateStr];
@@ -553,18 +477,13 @@
             let recordSnap = await getDoc(recordRef);
             let data;
             if (!recordSnap.exists()) {
-                data = {
-                    date: dateStr, checkedInTurn1: false, checkedInTurn2: false, status: 'pending',
-                    checkInTimeTurn1: null, checkOutTimeTurn1: null, checkInTimeTurn2: null, checkOutTimeTurn2: null, workSeconds: 0
-                };
+                data = { date: dateStr, workSeconds: 0 };
                 await setDoc(recordRef, data);
             } else {
                 data = recordSnap.data();
             }
 
-            if (!dailyRecordsCache[workerId]) {
-                dailyRecordsCache[workerId] = {};
-            }
+            if (!dailyRecordsCache[workerId]) dailyRecordsCache[workerId] = {};
             dailyRecordsCache[workerId][dateStr] = data;
             return data;
         }
@@ -575,35 +494,12 @@
             
             const selectedIds = Array.from(checkedBoxes).map(cb => cb.dataset.id);
             const now = new Date();
-            const todayStr = dateToYYYYMMDD(now);
-            const hours = now.getHours();
-            const isTurn1 = hours >= 7 && hours < 13;
-            const isTurn2 = hours >= 13 && hours < 18;
-
+            
             for (const id of selectedIds) {
                 const worker = workersData.find(w => w.id === id);
                 if (worker && !worker.checkedIn) {
-                    await runTransaction(db, async (transaction) => {
-                        const workerRef = doc(db, `artifacts/${appId}/public/data/workers`, id);
-                        const dailyRecordRef = doc(db, `artifacts/${appId}/public/data/workers/${id}/dailyRecords`, todayStr);
-                        const workerDoc = await transaction.get(workerRef);
-                        
-                        const lateMinutes = calculateLateness(worker, now);
-                        transaction.update(workerRef, {
-                            checkedIn: true, lastCheckInTime: Timestamp.fromDate(now), accumulatedLateMinutes: (workerDoc.data().accumulatedLateMinutes || 0) + lateMinutes,
-                            "dailyStatus.status": "present", "dailyStatus.date": todayStr
-                        });
-                        
-                        const dailyUpdate = { date: todayStr, status: 'present' };
-                        if (isTurn1) {
-                            dailyUpdate.checkedInTurn1 = true;
-                            dailyUpdate.checkInTimeTurn1 = Timestamp.fromDate(now);
-                        }
-                         if (isTurn2) {
-                            dailyUpdate.checkedInTurn2 = true;
-                            dailyUpdate.checkInTimeTurn2 = Timestamp.fromDate(now);
-                        }
-                        transaction.set(dailyRecordRef, dailyUpdate, { merge: true });
+                    await updateDoc(doc(db, `artifacts/${appId}/public/data/workers`, id), {
+                        checkedIn: true, lastCheckInTime: Timestamp.fromDate(now)
                     });
                 }
             }
@@ -612,6 +508,25 @@
             selectAllCheckbox.checked = false;
         });
         
+        async function completeShift(workerId, checkoutTime) {
+             const workerRef = doc(db, `artifacts/${appId}/public/data/workers`, workerId);
+             const workerDoc = await getDoc(workerRef);
+             if(!workerDoc.exists() || !workerDoc.data().checkedIn) return;
+             
+             const worker = workerDoc.data();
+             const now = checkoutTime ? checkoutTime.toDate() : new Date();
+             const sessionSeconds = (now.getTime() - worker.lastCheckInTime.toDate().getTime()) / 1000;
+             const newTotalWorkSeconds = (worker.totalWorkSeconds || 0) + sessionSeconds;
+             
+             const todayStr = dateToYYYYMMDD(now);
+             const dailyRecordRef = doc(db, `artifacts/${appId}/public/data/workers/${workerId}/dailyRecords`, todayStr);
+             const dailyRecord = await getOrCreateDailyRecord(workerId, todayStr);
+             const newDailyWorkSeconds = (dailyRecord.workSeconds || 0) + sessionSeconds;
+             
+             await updateDoc(workerRef, { checkedIn: false, lastCheckInTime: null, totalWorkSeconds: newTotalWorkSeconds });
+             await setDoc(dailyRecordRef, { workSeconds: newDailyWorkSeconds }, { merge: true });
+        }
+        
         earlyCheckoutForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(earlyCheckoutForm);
@@ -619,36 +534,11 @@
             const reason = formData.get('checkout-reason').trim();
             if (selectedIds.length === 0 || !reason) return showAlert('Error', 'Debes seleccionar obrero(s) y un motivo.', 'error');
             
-            const now = new Date();
-            const todayStr = dateToYYYYMMDD(now);
-            const hours = now.getHours();
-            const isTurn1 = hours >= 7 && hours < 13;
-
             for (const id of selectedIds) {
-                const worker = workersData.find(w => w.id === id);
-                if (worker && worker.checkedIn) {
-                    await runTransaction(db, async (transaction) => {
-                        const workerRef = doc(db, `artifacts/${appId}/public/data/workers`, id);
-                        const dailyRecordRef = doc(db, `artifacts/${appId}/public/data/workers/${id}/dailyRecords`, todayStr);
-                        const workerDoc = await transaction.get(workerRef);
-                        const dailyDoc = await transaction.get(dailyRecordRef);
-                        if (!workerDoc.exists()) throw "Worker does not exist!";
-                        
-                        const sessionSeconds = (now.getTime() - workerDoc.data().lastCheckInTime.toDate().getTime()) / 1000;
-                        const newTotalSeconds = (workerDoc.data().totalWorkSeconds || 0) + sessionSeconds;
-                        
-                        transaction.update(workerRef, { 
-                            checkedIn: false, lastCheckInTime: null, totalWorkSeconds: newTotalSeconds, earlyDepartures: arrayUnion({ reason, date: Timestamp.fromDate(now) }) 
-                        });
-
-                        const dailyUpdate = {};
-                        if (isTurn1) dailyUpdate.checkOutTimeTurn1 = Timestamp.fromDate(now);
-                        else dailyUpdate.checkOutTimeTurn2 = Timestamp.fromDate(now);
-                        
-                        if (dailyDoc.exists()) transaction.update(dailyRecordRef, dailyUpdate);
-                        else { dailyUpdate.date = todayStr; transaction.set(dailyRecordRef, dailyUpdate); }
-                    });
-                }
+                await completeShift(id);
+                await updateDoc(doc(db, `artifacts/${appId}/public/data/workers`, id), {
+                    earlyDepartures: arrayUnion({ reason, date: Timestamp.now() }) 
+                });
             }
             toggleModal(earlyCheckoutModal, false);
             earlyCheckoutForm.reset(); 
@@ -656,7 +546,26 @@
         });
 
         async function handleDailyProcesses() {
-            // ... (código existente)
+            const now = new Date();
+            const hours = now.getHours();
+            const minutes = now.getMinutes();
+
+            const morningCheckout = hours === 11 && minutes === 30 && !dailyProcessFlags.morning;
+            const eveningCheckout = hours === 18 && minutes === 0 && !dailyProcessFlags.evening;
+
+            if (morningCheckout || eveningCheckout) {
+                const checkoutTime = Timestamp.fromDate(new Date(now.setMinutes(morningCheckout ? 30 : 0, 0, 0)));
+                for(const worker of workersData) {
+                    if(worker.checkedIn) await completeShift(worker.id, checkoutTime);
+                }
+                if (morningCheckout) dailyProcessFlags.morning = true;
+                if (eveningCheckout) dailyProcessFlags.evening = true;
+            }
+
+            if (hours === 0 && (dailyProcessFlags.morning || dailyProcessFlags.evening)) {
+                 dailyProcessFlags = { morning: false, evening: false };
+                 console.log("Flags de checkout reiniciadas.");
+            }
         }
         
         addWorkerForm.addEventListener('submit', async (e) => { 
@@ -671,35 +580,29 @@
         });
 
         editWorkerForm.addEventListener('submit', async (e) => {
-            // ... (código existente)
+            e.preventDefault();
+            const workerId = el('edit-worker-id').value;
+            const updatedData = { name: el('edit-name').value, role: el('edit-role').value, dni: el('edit-dni').value, email: el('edit-email').value, hourlyRate: parseFloat(el('edit-hourlyRate').value) };
+            try {
+                await updateDoc(doc(db, `artifacts/${appId}/public/data/workers`, workerId), updatedData);
+                showAlert('Éxito', 'Los datos han sido actualizados.', 'success');
+                toggleModal(editWorkerModal, false);
+            } catch (err) { console.error(err); showAlert('Error', 'No se pudieron actualizar los datos.', 'error'); }
         });
 
         adjustmentDetailForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const workerId = el('adjust-detail-worker-id').value;
             const dateStr = el('adjustment-date-selector').value;
-            if (!dateStr) return showAlert('Error', 'Debe seleccionar una fecha para ajustar.', 'error');
-            const dateForTimestamp = new Date(dateStr.replace(/-/g, '/'));
+            if (!dateStr) return showAlert('Error', 'Debe seleccionar una fecha.', 'error');
             
-            const timeToTimestamp = (timeStr) => {
-                if (!timeStr) return null;
-                const [hours, minutes] = timeStr.split(':');
-                const date = new Date(dateForTimestamp);
-                date.setHours(hours, minutes, 0, 0);
-                return Timestamp.fromDate(date);
-            };
+            const hoursInput = el('adjust-hours-day').value;
+            const timeParts = hoursInput.split(':');
+            const hours = parseInt(timeParts[0], 10) || 0;
+            const minutes = parseInt(timeParts[1], 10) || 0;
+            const newDailyWorkSeconds = (hours * 3600) + (minutes * 60);
 
-            const t_in1 = timeToTimestamp(el('adjust-check-in-1').value);
-            const t_out1 = timeToTimestamp(el('adjust-check-out-1').value);
-            const t_in2 = timeToTimestamp(el('adjust-check-in-2').value);
-            const t_out2 = timeToTimestamp(el('adjust-check-out-2').value);
-
-            let newDailyWorkSeconds = 0;
-            if (t_in1 && t_out1 && t_out1.seconds > t_in1.seconds) newDailyWorkSeconds += (t_out1.seconds - t_in1.seconds);
-            if (t_in2 && t_out2 && t_out2.seconds > t_in2.seconds) newDailyWorkSeconds += (t_out2.seconds - t_in2.seconds);
-            
             const newAccumulatedLateMinutes = parseInt(el('adjust-lateness').value, 10) || 0;
-            const newStatus = el('adjust-attendance-status').value;
 
             try {
                 await runTransaction(db, async (transaction) => {
@@ -707,35 +610,18 @@
                     const dailyRecordRef = doc(db, `artifacts/${appId}/public/data/workers/${workerId}/dailyRecords`, dateStr);
                     
                     const workerDoc = await transaction.get(workerRef);
-                    if (!workerDoc.exists()) throw "Worker document not found!";
-                    const dailyDoc = await transaction.get(dailyRecordRef);
+                    if (!workerDoc.exists()) throw "Worker not found!";
+                    const dailyDoc = await getOrCreateDailyRecord(workerId, dateStr);
 
-                    const oldTotalWorkSeconds = workerDoc.data().totalWorkSeconds || 0;
-                    const oldDailyWorkSeconds = dailyDoc.exists() ? (dailyDoc.data().workSeconds || 0) : 0;
-                    
+                    const oldDailyWorkSeconds = dailyDoc.workSeconds || 0;
                     const workSecondsDelta = newDailyWorkSeconds - oldDailyWorkSeconds;
-                    const newTotalWorkSeconds = oldTotalWorkSeconds + workSecondsDelta;
+                    const newTotalWorkSeconds = (workerDoc.data().totalWorkSeconds || 0) + workSecondsDelta;
                     
-                    const updatedDailyData = {
-                        date: dateStr, workSeconds: newDailyWorkSeconds,
-                        checkInTimeTurn1: t_in1, checkOutTimeTurn1: t_out1,
-                        checkInTimeTurn2: t_in2, checkOutTimeTurn2: t_out2,
-                        status: newStatus,
-                        checkedInTurn1: !!t_in1,
-                        checkedInTurn2: !!t_in2,
-                    };
-                    
-                    const workerUpdateData = {
+                    transaction.update(workerRef, {
                         totalWorkSeconds: newTotalWorkSeconds,
                         accumulatedLateMinutes: newAccumulatedLateMinutes,
-                    };
-
-                    if (dateStr === dateToYYYYMMDD(new Date())) {
-                        workerUpdateData['dailyStatus'] = updatedDailyData;
-                    }
-
-                    transaction.update(workerRef, workerUpdateData);
-                    transaction.set(dailyRecordRef, updatedDailyData, { merge: true });
+                    });
+                    transaction.set(dailyRecordRef, { workSeconds: newDailyWorkSeconds }, { merge: true });
                 });
                 
                 showAlert('Éxito', 'El registro ha sido ajustado correctamente.', 'success');
@@ -849,11 +735,7 @@
             const workerId = el('adjust-detail-worker-id').value;
             if(!dateStr || !workerId) return;
             const dailyRecord = await getOrCreateDailyRecord(workerId, dateStr);
-            el('adjust-check-in-1').value = timestampToHHMM(dailyRecord.checkInTimeTurn1);
-            el('adjust-check-out-1').value = timestampToHHMM(dailyRecord.checkOutTimeTurn1);
-            el('adjust-check-in-2').value = timestampToHHMM(dailyRecord.checkInTimeTurn2);
-            el('adjust-check-out-2').value = timestampToHHMM(dailyRecord.checkOutTimeTurn2);
-            el('adjust-attendance-status').value = dailyRecord.status || 'pending';
+            el('adjust-hours-day').value = formatTime(dailyRecord.workSeconds || 0);
         });
         
         workersTableBody.addEventListener('click', async (e) => { 
@@ -979,7 +861,7 @@
             }
             const { range, data } = currentReportData;
             
-            const headers = ["Fecha", "Obrero", "Estado Asistencia", "Entrada Mañana", "Salida Mañana", "Entrada Tarde", "Salida Tarde", "Horas del Día", "Pago del Día"];
+            const headers = ["Fecha", "Obrero", "Horas del Día", "Pago del Día"];
             const rows = [];
             let grandTotalPay = 0;
 
@@ -988,8 +870,8 @@
                     const dailyPay = (record.workSeconds / 3600) * (item.workerInfo.hourlyRate || 0);
                     grandTotalPay += dailyPay;
                     rows.push([
-                        `"${record.date}"`, `"${item.workerInfo.name}"`, `"${record.status || 'N/A'}"`, `"${timestampToHHMM(record.checkInTimeTurn1)}"`, `"${timestampToHHMM(record.checkOutTimeTurn1)}"`,
-                        `"${timestampToHHMM(record.checkInTimeTurn2)}"`, `"${timestampToHHMM(record.checkOutTimeTurn2)}"`, (record.workSeconds / 3600).toFixed(2), dailyPay.toFixed(2)
+                        `"${record.date}"`, `"${item.workerInfo.name}"`, 
+                        (record.workSeconds / 3600).toFixed(2), dailyPay.toFixed(2)
                     ]);
                 });
             });
