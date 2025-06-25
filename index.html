@@ -24,7 +24,7 @@
 </head>
 <body class="p-4 md:p-8">
 
-    <div id="app" class="max-w-6xl mx-auto">
+    <div id="app" class="max-w-full mx-auto">
         <!-- Encabezado -->
         <header class="mb-8 p-4 bg-white rounded-lg shadow-md no-print">
             <div class="flex flex-col md:flex-row justify-between items-center">
@@ -65,7 +65,6 @@
                         <th scope="col" class="p-4"><input type="checkbox" id="select-all-checkbox" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded"></th>
                         <th scope="col" class="px-4 py-3">Obrero</th>
                         <th scope="col" class="px-4 py-3">Categoría</th>
-                        <th scope="col" class="px-4 py-3 text-center">Estado</th>
                         <th scope="col" class="px-4 py-3 text-center">Horas del Día</th>
                         <th scope="col" class="px-4 py-3 text-center">Horas Totales</th>
                         <th scope="col" class="px-4 py-3 text-right">Precio / Hr</th>
@@ -74,7 +73,7 @@
                     </tr>
                 </thead>
                 <tbody id="workers-table-body">
-                     <tr id="loading-row"><td colspan="9" class="text-center p-8"><div class="flex justify-center items-center space-x-2 text-gray-500"><i class="ph ph-circle-notch text-2xl animate-spin"></i><span>Cargando datos...</span></div></td></tr>
+                     <tr id="loading-row"><td colspan="8" class="text-center p-8"><div class="flex justify-center items-center space-x-2 text-gray-500"><i class="ph ph-circle-notch text-2xl animate-spin"></i><span>Cargando datos...</span></div></td></tr>
                 </tbody>
             </table>
         </div>
@@ -161,7 +160,19 @@
     </div>
     <div id="early-checkout-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-hidden modal-backdrop bg-black bg-opacity-50 no-print">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-lg modal-content modal-content-hidden">
-            <form id="early-checkout-form" class="p-6"><h2 class="text-2xl font-bold mb-4">Salida Anticipada</h2><p class="text-sm text-gray-600 mb-6">Selecciona el personal y especifica el motivo.</p><div id="early-checkout-worker-list" class="mb-4 max-h-60 overflow-y-auto border rounded-lg p-3 space-y-2"></div><div class="mb-6"><label for="checkout-reason" class="block text-sm font-bold mb-2">Motivo:</label><textarea id="checkout-reason" name="checkout-reason" rows="3" class="shadow border rounded w-full py-2 px-3" required></textarea></div><div class="flex justify-end space-x-4"><button type="button" id="cancel-early-checkout" class="bg-gray-300 hover:bg-gray-400 font-bold py-2 px-4 rounded-lg">Cancelar</button><button type="submit" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-lg">Confirmar</button></div></form>
+            <form id="early-checkout-form" class="p-6">
+                <h2 class="text-2xl font-bold mb-4">Salida Anticipada</h2>
+                <p class="text-sm text-gray-600 mb-6">Selecciona el personal y especifica el motivo.</p>
+                <div class="flex justify-between items-center p-2 border-b mb-2">
+                    <label for="select-all-early-checkout" class="flex items-center space-x-2 text-sm font-semibold">
+                        <input type="checkbox" id="select-all-early-checkout" class="h-4 w-4 text-orange-600 rounded">
+                        <span>Seleccionar Todos</span>
+                    </label>
+                </div>
+                <div id="early-checkout-worker-list" class="mb-4 max-h-60 overflow-y-auto rounded-lg p-1 space-y-2"></div>
+                <div class="mb-6"><label for="checkout-reason" class="block text-sm font-bold mb-2">Motivo:</label><textarea id="checkout-reason" name="checkout-reason" rows="3" class="shadow border rounded w-full py-2 px-3" required></textarea></div>
+                <div class="flex justify-end space-x-4"><button type="button" id="cancel-early-checkout" class="bg-gray-300 hover:bg-gray-400 font-bold py-2 px-4 rounded-lg">Cancelar</button><button type="submit" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-lg">Confirmar</button></div>
+            </form>
         </div>
     </div>
     <div id="report-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-hidden modal-backdrop bg-black bg-opacity-50">
@@ -260,6 +271,7 @@
         const cancelEarlyCheckoutBtn = el('cancel-early-checkout');
         const earlyCheckoutForm = el('early-checkout-form');
         const earlyCheckoutWorkerList = el('early-checkout-worker-list');
+        const selectAllEarlyCheckout = el('select-all-early-checkout');
         const managementModal = el('management-modal');
         const closeManagementBtn = el('close-management-btn');
         const managementWorkerList = el('management-worker-list');
@@ -308,13 +320,7 @@
         function formatCurrency(amount) {
             return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount || 0);
         }
-        function timestampToHHMM(timestamp) {
-            if (!timestamp) return '';
-            const date = timestamp.toDate();
-            const hours = date.getHours().toString().padStart(2, '0');
-            const minutes = date.getMinutes().toString().padStart(2, '0');
-            return `${hours}:${minutes}`;
-        }
+        
         function dateToYYYYMMDD(date) {
             return date.toISOString().split('T')[0];
         }
@@ -364,6 +370,12 @@
             toggleModal(earlyCheckoutModal, true);
         });
         cancelEarlyCheckoutBtn.addEventListener('click', () => { toggleModal(earlyCheckoutModal, false); earlyCheckoutForm.reset(); });
+        selectAllEarlyCheckout.addEventListener('change', (e) => {
+            document.querySelectorAll('#early-checkout-worker-list input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = e.target.checked;
+            });
+        });
+
         togglePasswordBtn.addEventListener('click', () => {
             const isPassword = passwordInput.type === 'password';
             passwordInput.type = isPassword ? 'text' : 'password';
@@ -409,7 +421,6 @@
                     <td class="p-4"><input type="checkbox" class="worker-checkbox w-4 h-4 text-blue-600 rounded" data-id="${worker.id}" ${isChecked}></td>
                     <td class="px-4 py-4 font-medium text-gray-900 whitespace-nowrap">${worker.name}<div class="text-xs text-gray-500">${worker.dni || 'N/A'}</div></td>
                     <td class="px-4 py-3">${worker.role}</td>
-                    <td class="px-4 py-3 text-center status-cell"></td>
                     <td class="px-4 py-3 text-center font-mono text-base daily-duration-cell">00:00</td>
                     <td class="px-4 py-3 text-center font-mono text-base total-duration-cell">00:00</td>
                     <td class="px-4 py-3 text-right">${formatCurrency(worker.hourlyRate)}</td>
@@ -441,11 +452,9 @@
                 const sessionSeconds = (now.getTime() - worker.lastCheckInTime.toDate().getTime()) / 1000;
                 totalWorkDuration += sessionSeconds;
                 dailyWorkSeconds += sessionSeconds;
-                row.className = 'bg-green-100 border-b';
-                row.querySelector('.status-cell').innerHTML = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-200 text-green-800 status-pulse">EN TURNO</span>`;
+                row.className = 'bg-green-100 border-b status-pulse';
             } else {
                 row.className = workersData.findIndex(w => w.id === workerId) % 2 === 0 ? 'bg-white border-b' : 'bg-gray-50 border-b';
-                row.querySelector('.status-cell').innerHTML = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-200 text-gray-800">AUSENTE</span>`;
             }
             
             const totalPay = (totalWorkDuration / 3600) * (worker.hourlyRate || 0);
@@ -504,7 +513,7 @@
                 }
             }
             showAlert('Éxito', `Ingreso registrado para ${selectedIds.length} obrero(s).`, 'success');
-            checkedBoxes.forEach(box => box.checked = false);
+            document.querySelectorAll('.worker-checkbox:checked').forEach(cb => cb.checked = false);
             selectAllCheckbox.checked = false;
         });
         
@@ -543,6 +552,10 @@
             toggleModal(earlyCheckoutModal, false);
             earlyCheckoutForm.reset(); 
             showAlert('Éxito', `Salida anticipada registrada.`, 'success');
+            document.querySelectorAll('#early-checkout-worker-list input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            selectAllEarlyCheckout.checked = false;
         });
 
         async function handleDailyProcesses() {
@@ -621,7 +634,7 @@
                         totalWorkSeconds: newTotalWorkSeconds,
                         accumulatedLateMinutes: newAccumulatedLateMinutes,
                     });
-                    transaction.set(dailyRecordRef, { workSeconds: newDailyWorkSeconds }, { merge: true });
+                    transaction.set(dailyRecordRef, { workSeconds: newDailyWorkSeconds, date: dateStr }, { merge: true });
                 });
                 
                 showAlert('Éxito', 'El registro ha sido ajustado correctamente.', 'success');
@@ -908,7 +921,6 @@
             setInterval(handleDailyProcesses, 60000); 
             authenticateUser();
         });
-
     </script>
 </body>
 </html>
