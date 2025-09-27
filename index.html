@@ -3,6 +3,7 @@
 <head>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4f46e5">
+    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Planilla de Control Horario - Obra</title>
@@ -22,14 +23,6 @@
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .7; } }
         .status-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
         .tab-active { border-color: #4f46e5; color: #4f46e5; }
-        /* Estilos para impresión del reporte */
-        @media print {
-            .no-print { display: none !important; }
-            body { background-color: white; margin: 0; padding: 0; }
-            #report-body { padding: 0 !important; }
-            .modal-content { max-width: none; width: 100%; box-shadow: none; border: none; transform: none !important; }
-            #report-modal { position: static; display: block; opacity: 1; background: none; }
-        }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -201,12 +194,10 @@
     </div>
 
     <script type="module">
-        // La importación de módulos de Firebase es correcta y funciona.
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, collection, getDocs, onSnapshot, updateDoc, deleteDoc, serverTimestamp, Timestamp, writeBatch, arrayUnion, runTransaction, setDoc, getDoc, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, collection, getDocs, onSnapshot, updateDoc, deleteDoc, serverTimestamp, Timestamp, writeBatch, arrayUnion, runTransaction, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Configuración de Firebase (Copiada de tu imagen y código original)
         const firebaseConfig = {
           apiKey: "AIzaSyBmqG6_pD7OzSGhOaZSRc4IVfXwNaADE8U",
           authDomain: "planilla-c17ab.firebaseapp.com",
@@ -216,7 +207,6 @@
           appId: "1:993902505533:web:9154f4bd2c95e088c78454"
         };
         
-        // Resto de la lógica de tu aplicación (no se hicieron cambios aquí ya que todo es correcto)
         const appId = 'planilla-c17ab';
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -559,11 +549,10 @@
             const fd = new FormData(addWorkerForm); 
             const newWorker = { name: fd.get('name'), role: fd.get('role'), dni: fd.get('dni'), email: fd.get('email'), hourlyRate: parseFloat(fd.get('hourlyRate')), checkedIn: false, lastCheckInTime: null, totalWorkSeconds: 0, accumulatedLateMinutes: 0, earlyDepartures: [], createdAt: serverTimestamp() }; 
             try { 
-                // ESTA FUNCIÓN ESTABA CORRECTA Y YA USABA addDoc.
                 await addDoc(collection(db, `artifacts/${appId}/public/data/workers`), newWorker); 
                 showAlert('Éxito', `${newWorker.name} ha sido agregado.`, 'success'); 
                 toggleModal(addWorkerModal, false); addWorkerForm.reset(); 
-            } catch (err) { console.error(err); showAlert('Error', 'No se pudo agregar al obrero. Revisa los permisos de Firebase.', 'error'); } 
+            } catch (err) { console.error(err); showAlert('Error', 'No se pudo agregar al obrero.', 'error'); } 
         });
 
         editWorkerForm.addEventListener('submit', async (e) => {
@@ -631,7 +620,7 @@
                     if (confirm(`¿Estás seguro de que quieres eliminar a ${worker.name}?`)) {
                         deleteDoc(doc(db, `artifacts/${appId}/public/data/workers`, pendingAction.workerId))
                             .then(() => showAlert('Eliminado', `${worker.name} fue eliminado.`, 'success'))
-                            .catch(() => showAlert('Error', 'No se pudo eliminar. Revisa los permisos.', 'error'));
+                            .catch(() => showAlert('Error', 'No se pudo eliminar.', 'error'));
                     }
                 } else if (pendingAction.type === 'edit') {
                     const worker = workersData.find(w => w.id === pendingAction.workerId);
@@ -871,11 +860,11 @@
     // Script para registrar el Service Worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then(registration => {
+        // RUTA CORREGIDA: Usando './sw.js' para buscar en la carpeta actual del proyecto.
+        navigator.serviceWorker.register('./sw.js').then(registration => { 
           console.log('ServiceWorker registrado con éxito: ', registration.scope);
         }, err => {
-          // Si da 404, es porque el archivo sw.js no existe.
-          console.error('Fallo en el registro de ServiceWorker. (Asegúrate que /sw.js exista y sea accesible): ', err);
+          console.log('Fallo en el registro de ServiceWorker: ', err);
         });
       });
     }
